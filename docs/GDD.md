@@ -1,0 +1,140 @@
+# Game Design Document — Neon City Runners
+
+## 1. Resumen del juego
+Slot HTML5 5x4, 12 líneas, tema cyberpunk-heist. Un símbolo generador (**Core AI**) crea wilds aleatorios en cada giro; acumular suficientes **Data Vault** (scatter) activa una ronda de Free Spins donde los Cores quedan pegados y siguen generando wilds ronda tras ronda.
+
+Proyecto de portfolio orientado a estudios de iGaming (Pragmatic Play, Red Tiger, Nolimit City).
+
+## 2. Ambientación
+Ciudad cyberpunk controlada por corporaciones de datos. El jugador es parte de un equipo de "runners" que hackea **Cores** de IA corporativa para liberar wilds (glitches en el sistema) y asaltar **Data Vaults** — de ahí "Heist Free Spins": la ronda de bonus es literalmente el golpe al vault.
+
+Esto da pie a nombrar assets/UI coherentemente más adelante (ej. mensajes de "ACCESS GRANTED" al activar Free Spins, "CORE COMPROMISED" cuando un Core se vuelve sticky, etc.) — anotado para la fase de UI/UX (NCR-E5).
+
+## 3. Especificaciones
+| | |
+|---|---|
+| Grid | 5 rodillos x 4 filas |
+| Líneas de pago | 12 |
+| Dirección de pago | Izquierda a derecha |
+| Apuesta | Configurable por línea |
+| RTP objetivo | ~96% (a validar, ver NCR-E6) |
+| Volatilidad | Media-alta |
+
+## 4. Símbolos y pagos
+Tabla completa y reel strips en [`docs/math.md`](./math.md) — no se duplica acá para evitar que las dos fuentes se desincronicen. Resumen de roles:
+
+- **High/Low regulares** (Runner, Netrunner, CyberDog, Drone, A, K, Q, J): pago estándar por línea.
+- **Glitch (WILD)**: sustituye a todo excepto Scatter y Core. No está en el reel strip — solo lo genera el Core AI.
+- **Core AI**: sin pago directo, es el símbolo generador.
+- **Data Vault (SCATTER)**: paga por cantidad en cualquier posición y activa Free Spins.
+
+## 5. Mecánicas especiales
+
+### 5.1 Core AI → Glitch Wilds
+Cada Core AI en el grid genera 2-4 wilds en posiciones aleatorias (sin pisar Core/Scatter existentes). Implementado en `SlotEngine.ts` (`applyCoreWildGeneration`) — ver NCR-E1 (Done).
+
+### 5.2 Data Vault → Heist Free Spins
+3+ Scatter en cualquier posición otorgan 8 Free Spins. Durante la ronda:
+- Los Core AI que caen quedan **sticky** (fijos en su posición) por el resto de la ronda.
+- Cada giro de Free Spins fuerza Core en todas las posiciones sticky acumuladas, gira el resto del grid normalmente, y aplica generación de wilds usando **todos** los Cores (sticky + nuevos).
+- Los Cores nuevos que caen se suman a la lista de sticky para el próximo giro.
+
+Estado en desarrollo — ver NCR-E2 (To Do).
+
+## 6. Matemática
+Ver [`docs/math.md`](./math.md) para reel strips, tabla de pagos completa y cómo se calcula el RTP. El número real (no estimado) se valida con simulación Monte Carlo — NCR-E6.
+
+## 7. Dirección de arte y audio
+
+### 7.1 Concepto visual
+Estética cyberpunk nocturna: ciudad lluviosa, neones saturados, interfaces holográficas, distorsión digital ("glitch") como motivo recurrente — coherente con la narrativa (sección 2). El HUD y los símbolos deberían sentirse como una interfaz robada de un sistema corporativo, no como un tablero de casino genérico.
+
+### 7.2 Paleta de colores
+Definida a partir de los placeholders ya usados en `SlotGame.ts`, para que el arte final la respete:
+
+| Uso | Color | Hex |
+|---|---|---|
+| Acento primario / CTA (botón Spin, líneas ganadoras) | Magenta neón | `#ff2e88` |
+| Acento secundario / Core AI, Wild | Cian / verde-agua neón | `#33f2c7` / `#2effe0` |
+| Símbolos high-tier | Violeta neón | `#8a2eff` |
+| Scatter / Data Vault | Amarillo neón | `#ffee00` |
+| Fondo base | Azul-violeta muy oscuro | `#0a0a12` / `#14082a` |
+| Símbolos low-tier (A/K/Q/J) | Gris azulado neutro | `#444455` |
+
+### 7.3 Concepto por símbolo
+
+| Símbolo | Concepto visual | Notas de animación |
+|---|---|---|
+| Runner / Netrunner | Personajes hacker estilizados, silueta con detalles neón | Ligero parpadeo de neón al formar parte de una línea ganadora |
+| CyberDog / Drone | Unidades robóticas de apoyo del equipo de runners | — |
+| A/K/Q/J | Cartas rediseñadas como paneles holográficos, no cartas clásicas | Sutil escaneo de luz al caer |
+| Core AI | Núcleo/orbe de IA pulsante, con circuitos visibles | Pulso de energía al caer; "descarga" hacia las posiciones donde genera wilds |
+| Glitch (Wild) | Distorsión visual tipo glitch/error de sistema, no un ícono fijo | Aparece con un efecto de interferencia (glitch-in), no con un simple fade |
+| Data Vault (Scatter) | Bóveda de datos con ícono de candado/lock digital | Al caer 3+, "desbloqueo" visual progresivo símbolo por símbolo |
+
+### 7.4 Animaciones clave
+- **Giro de rodillos:** blur de movimiento, sin ser tan rápido que impida leer los símbolos al pasar.
+- **Aterrizaje de símbolo:** rebote sutil (overshoot + settle), no un corte seco.
+- **Activación de Core AI:** pulso/escaneo en el símbolo, seguido de una animación de "descarga" o línea de energía hacia cada posición donde aparece un wild nuevo.
+- **Aparición de Wild:** efecto glitch/interferencia en vez de un simple cambio de sprite — refuerza la idea de "falla en el sistema".
+- **Líneas ganadoras:** highlight con glow + trazo de la línea sobre el grid, símbolo por símbolo en la combinación.
+- **Trigger de Free Spins:** transición fuerte (ej. "screen glitch" a pantalla completa) con mensaje tipo "ACCESS GRANTED" antes de entrar a Heist mode.
+- **Cores sticky en Free Spins:** marca visual persistente (ej. borde/glow distinto) para diferenciarlos de un Core recién caído.
+
+### 7.5 VFX por nivel de premio
+Para que la intensidad visual comunique el tamaño del premio (patrón estándar en la industria):
+
+| Nivel de premio | VFX |
+|---|---|
+| Menor (línea simple) | Glow leve sobre la línea, sin partículas |
+| Medio | Partículas cortas + contador de premio con "count-up" |
+| Grande | Partículas + shake de cámara leve + destaque de pantalla |
+| Muy grande / Free Spins total | Secuencia dedicada de "big win", pantalla completa, contador prolongado |
+
+### 7.6 Música
+- **Loop de juego base:** synthwave/cyberpunk ambiental, tempo medio, no invasivo — tiene que poder sonar en loop largo sin cansar.
+- **Loop de Free Spins (Heist mode):** variación más intensa/energética del mismo tema (mismo motivo musical, arreglo más denso) para reforzar que "estamos dentro del golpe".
+- **Stinger de big win:** frase musical corta y distinta, no un loop.
+
+### 7.7 Sonido (SFX)
+| Evento | Sonido |
+|---|---|
+| Click en botón Spin | Click UI corto, tono digital |
+| Parada de cada rodillo | Golpe seco/mecánico con textura digital |
+| Activación de Core AI | Zap/glitch electrónico |
+| Aparición de cada Wild | Sonido de interferencia corto, distinto al de Core |
+| Data Vault cayendo | Chime metálico/digital, más intenso a medida que se acerca a 3+ |
+| Trigger de Free Spins | Fanfarria corta tipo "acceso concedido" |
+| Premio (por nivel) | Escalado: desde un tintineo simple hasta una secuencia de monedas/energía para premios grandes |
+
+### 7.8 Estado de implementación
+Toda esta sección es dirección de arte/audio a implementar — ninguno de estos elementos está construido todavía (los placeholders actuales en `SlotGame.ts` son solo rectángulos de color). Corresponde a NCR-E4 (Animaciones & FX) y NCR-E5 (UI/UX & Paytable); el audio no tiene épica propia todavía — se suma como nota para crear una si se decide encararlo.
+
+## 8. Experiencia de usuario (estados del juego)
+1. **Base game**: grid gira, Core AI puede generar wilds, se evalúan líneas.
+2. **Trigger de Free Spins**: 3+ Scatter → transición visual (pendiente, NCR-E4) → entra a Heist mode.
+3. **Free Spins (Heist mode)**: contador de spins restantes, ganancia acumulada de la ronda visible, Cores sticky marcados visualmente (pendiente, NCR-E5).
+4. **Fin de ronda**: resumen de ganancia total de Free Spins, vuelve a base game.
+
+## 9. Arquitectura técnica
+Ver [`docs/architecture.md`](./architecture.md) para estructura de carpetas y decisiones de implementación (RNG aislado, endpoint stateless en base game, etc.).
+
+## 10. Registro de decisiones de diseño
+
+| ID | Decisión | Alternativas consideradas | Motivo | Épica/Historia |
+|---|---|---|---|---|
+| D-01 | El Wild no está en el reel strip, solo lo genera el Core AI | Wild con probabilidad propia en el strip | Matemática más controlable: se ajusta volatilidad vía cantidad de wilds por Core sin tocar el strip | NCR-E1 |
+| D-02 | El Wild no tiene tabla de pago propia en v1 | Wild paga como línea propia (más alto que Runner) | Simplifica el balanceo inicial; se puede sumar después si el RTP lo necesita | NCR-E1 |
+| D-03 | RNG aislado en un único módulo (`RNG.ts`) | RNG disperso en cada función que lo necesite | Permite reemplazarlo por un RNG certificado sin tocar el resto del motor | NCR-E1 |
+| D-04 | Sesión de Free Spins en memoria del servidor (`Map`), no en el cliente | Estado manejado por el cliente y enviado en cada request | Nunca confiar en el cliente para nada que afecte el payout — estándar de la industria | NCR-E2 |
+| D-05 (propuesta) | Los Cores del giro que activa Free Spins NO quedan sticky; los sticky arrancan en el primer giro de la ronda | Que el Core del giro trigger ya cuente como sticky | Ese giro es técnicamente base game; evita ambigüedad sobre a qué "ronda" pertenece | NCR-E2 |
+| D-06 (propuesta) | Sin retrigger de Free Spins en v1 (3+ Scatter durante FS no extiende la ronda) | Implementar retrigger como en slots reales | Reduce alcance y complejidad de sesión para la v1; queda anotado como mejora futura | NCR-E2 |
+| D-07 | Sesión de Free Spins vive solo en memoria del proceso Node, sin persistencia en DB | Persistir sesiones en Redis/DB | No se justifica la complejidad para un portfolio demo; limitación conocida y documentada | NCR-E2 |
+
+*D-05, D-06 y D-07 están marcadas como propuestas hasta confirmación — actualizar esta tabla si cambian antes de implementar NCR-E2.*
+
+## 11. Fuera de alcance para v1
+- Retrigger de Free Spins.
+- Wild con tabla de pago propia.
+- Persistencia de sesión entre reinicios del servidor.
+- RNG certificado (se usa `Math.random()`, aislado para reemplazo futuro).

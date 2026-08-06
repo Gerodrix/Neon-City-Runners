@@ -48,38 +48,55 @@ El Wild **no está en el reel strip**: solo aparece generado por el Core AI.
 
 ## RTP medido (simulación Monte Carlo — NCR-E6)
 
-Validado con `npm run simulate` (3.000.000 giros, `server/src/scripts/simulate.ts`), que reutiliza el motor real (`SlotEngine` + `FreeSpinsLogic`), no una fórmula aparte.
+Validado con `npm run simulate` (`server/src/scripts/simulate.ts`), que reutiliza el motor real (`SlotEngine` + `FreeSpinsLogic`), no una fórmula aparte.
 
-| Métrica | Valor medido |
+### Por qué un solo número de una sola corrida no alcanza
+`Math.random()` no está seedeado, así que cada corrida da un resultado distinto. Con pocos millones de giros el margen de error todavía es grande — hay eventos raros pero de alto impacto (combinaciones de 5 símbolos altos, rondas de Free Spins muy cargadas de Cores) que mueven bastante el promedio si caen o no caen dentro de la muestra:
+
+| Giros simulados | RTP medido |
 |---|---|
-| **RTP total** | **96.07%** |
-| Aporte base game | 84.08% |
-| Aporte Free Spins | 12.00% |
-| Hit frequency (base game) | 57.44% |
-| Frecuencia de trigger de Free Spins | 0.864% (1 cada ~116 giros) |
+| 1,000,000 | 90.02% – 104.55% (rango de 6 corridas independientes) |
+| 10,000,000 | 100.37% |
+| 30,000,000 | 95.14% |
 
-### Cómo se llegó a este número
-La primera versión de la matemática (Core y Scatter al 5% cada uno, tabla de pagos original) midió **140.50% de RTP** — el juego pagaba mucho más de lo que se apostaba, y activaba Free Spins 1 cada 16 giros (demasiado frecuente para un feature de bonus). El proceso de calibración fue iterativo, todo verificado por simulación en cada paso, no ajustado a ojo:
-1. Se bajó Scatter de 2 a 1 por strip (5% → 2.5%), llevando el trigger de Free Spins a ~1 cada 116 giros — un rango razonable para un feature de bonus.
-2. Se probó bajar también Core de 2 a 1, pero el RTP cayó a 36% (sobrecorrección) — se mantuvo Core en 2.
-3. Con esa base (70.45% de RTP), se escaló la tabla de pagos completa (~1.36x sobre los valores originales) en tres pasadas, midiendo con simulación después de cada ajuste, hasta converger en 96.07%.
+### Número validado (agrupando todas las corridas)
+En vez de quedarse con la última corrida, se agrupan (weighted average) los **46,000,000 de giros** simulados en total:
+
+**RTP validado: 96.77%**
+
+Esto es más honesto que reportar el resultado de una sola corrida de 1-3M como si fuera definitivo — a esa escala el número individual todavía puede estar ±5-8 puntos del valor real. Está dentro del objetivo de diseño (~96%) sin necesidad de un ajuste adicional.
+
+Las métricas que no dependen de eventos raros de alto pago se estabilizan mucho más rápido — estas ya eran consistentes entre corridas de 1M y de 30M:
+
+| Métrica | Valor (estable entre corridas) |
+|---|---|
+| Hit frequency (base game) | ~57.5-58% |
+| Frecuencia de trigger de Free Spins | ~0.86% (1 cada ~116-117 giros) |
+| Aporte de Free Spins al RTP | ~12% |
+
+### Cómo se llegó a la tabla de pagos actual
+La primera versión de la matemática (Core y Scatter al 5% cada uno, tabla de pagos original) midió ~140% de RTP — el juego pagaba mucho más de lo que se apostaba, y activaba Free Spins 1 cada 16 giros (demasiado frecuente para un feature de bonus). La calibración fue iterativa, verificada por simulación en cada paso:
+1. Se bajó Scatter de 2 a 1 por strip (5% → 2.5%), llevando el trigger de Free Spins a ~1 cada 116-117 giros — estable en todas las corridas posteriores, independientemente del tamaño de muestra.
+2. Se probó bajar también Core de 2 a 1, pero el RTP cayó a ~36% (sobrecorrección) — se mantuvo Core en 2.
+3. Con esa base, se escaló la tabla de pagos completa (~1.36x sobre los valores originales) en tres pasadas, hasta acercarse al objetivo.
+4. Una vez cerca, se corrieron múltiples simulaciones grandes (hasta 30M de giros) para confirmar que el número no era ruido de una sola corrida — así se llegó al 96.77% agrupado.
 
 ### Metodología (para referencia)
 El RTP se compone de: (1) valor esperado de líneas base, (2) contribución del Core AI vía wilds generados, y (3) contribución de Scatter/Free Spins — los tres puntos (2) y (3) no tienen fórmula cerrada simple por la aleatoriedad de posiciones y el estado acumulado entre giros de Free Spins, por eso se miden con simulación en vez de calcularse a mano.
 
 ## D-08 — Distribución del premio dentro de una ronda de Free Spins
 
-La simulación mide el premio promedio de cada uno de los 8 giros de una ronda (posición 1 a 8), para confirmar o descartar el hallazgo D-08 (ver GDD, Registro de decisiones):
+A diferencia del RTP total, esta distribución resultó estable entre corridas de distinto tamaño (2M, 3M, 10M, 30M) — no depende tanto de eventos raros de pago alto, así que el patrón se puede dar por confirmado con confianza. Valores de la corrida de 30M:
 
 | Giro dentro de la ronda | Premio promedio | % de giros en 0 |
 |---|---|---|
-| 1 | 10.17 | 42.5% |
-| 2 | 23.82 | 24.9% |
-| 3 | 31.67 | 23.4% |
-| 4 | 32.04 | 32.8% |
-| 5 | 26.64 | 47.9% |
-| 6 | 20.24 | 62.6% |
-| 7 | 13.63 | 75.4% |
-| 8 | 8.48 | 84.6% |
+| 1 | 9.90 | 42.1% |
+| 2 | 23.71 | 24.2% |
+| 3 | 31.90 | 22.5% |
+| 4 | 32.05 | 32.4% |
+| 5 | 27.08 | 47.2% |
+| 6 | 20.14 | 62.2% |
+| 7 | 13.90 | 74.7% |
+| 8 | 8.96 | 83.8% |
 
 **Confirmado, parcialmente mitigado:** con la matemática recalibrada, el premio sube y llega a su pico en el giro 3-4 (el patrón de "progresión" del pilar de diseño se cumple en la primera mitad de la ronda), pero cae fuerte en la segunda mitad — para el giro 8, el 84.6% de los giros no paga nada. La causa sigue siendo la misma: demasiados Cores sticky acumulados saturan el grid de Wilds sin tabla de pago propia (D-02). No se corrige en v1 — queda anotado en el roadmap del GDD como mejora futura (ej. limitar la cantidad máxima de Cores sticky, o darle tabla de pago propia al Wild).

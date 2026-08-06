@@ -77,7 +77,7 @@ Formato: cada Epic agrupa historias de usuario con criterios de aceptación. Los
 - **NCR-S6.4 (QA)** — Como desarrollador, quiero medir si los giros tardíos de una ronda de Free Spins (muchos Cores sticky) pagan significativamente menos que los tempranos.
   *Criterios de aceptación:* la simulación reporta spinWin promedio por número de orden dentro de la ronda de FS (giro 1, 2, ... 8); con ese dato se decide si D-08 amerita ajustar D-02. ✅ Confirmado: cae de 31.67 (giro 3) a 8.48 (giro 8), 84.6% de giros en 0 al final. Se decide no corregir en v1 (ver GDD, D-08).
 - **NCR-S6.2** — Como desarrollador, quiero poder ajustar `REEL_STRIP_COUNTS` y volver a correr la simulación para calibrar el RTP hacia ~96%.
-  *Criterios de aceptación:* RTP medido dentro de un rango razonable del objetivo. ✅ RTP inicial 140.50% → recalibrado a 96.07% en 4 iteraciones (Scatter 2→1, tabla de pagos ~1.36x). Ver GDD, D-09.
+  *Criterios de aceptación:* RTP medido dentro de un rango razonable del objetivo. ✅ RTP inicial ~140% → recalibrado, validado en 96.77% agrupando 46M de giros (corridas individuales de 1-30M variaron entre 90% y 105%, por eso se agrupó en vez de confiar en una sola corrida). Ver GDD, D-09/D-10.
 - **NCR-S6.3** — Como desarrollador, quiero documentar el RTP final validado en `docs/math.md`, reemplazando el estimado inicial.
   *Criterios de aceptación:* `math.md` refleja el número medido, no una intención de diseño. ✅
 

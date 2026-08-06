@@ -3,6 +3,7 @@ import { SymbolId, SYMBOL_DEFINITIONS } from './Symbol.js';
 import { buildReelStrip, spinReel } from './ReelStrip.js';
 import { PAYLINES } from './Paylines.js';
 import { RNG } from './RNG.js';
+import { createFreeSpinsSession } from './FreeSpinsSession.js';
 
 export interface GridPosition {
   reel: number;
@@ -27,6 +28,8 @@ export interface SpinResult {
   totalWin: number;
   freeSpinsTriggered: boolean;
   freeSpinsAwarded: number;
+  /** Presente solo si freeSpinsTriggered es true — usar en POST /free-spin. */
+  freeSpinsSessionId: string | null;
 }
 
 // Un strip por rodillo. En v1 los 5 usan el mismo conteo de símbolos.
@@ -36,12 +39,12 @@ function toIndex(reel: number, row: number): number {
   return reel * GRID_ROWS + row;
 }
 
-function generateGrid(): SymbolId[][] {
+export function generateGrid(): SymbolId[][] {
   return REEL_STRIPS.map((strip) => spinReel(strip, GRID_ROWS));
 }
 
 /** Encuentra todas las posiciones donde cayó CORE AI. */
-function findCorePositions(grid: SymbolId[][]): GridPosition[] {
+export function findCorePositions(grid: SymbolId[][]): GridPosition[] {
   const positions: GridPosition[] = [];
   for (let reel = 0; reel < GRID_REELS; reel++) {
     for (let row = 0; row < GRID_ROWS; row++) {
@@ -56,7 +59,7 @@ function findCorePositions(grid: SymbolId[][]): GridPosition[] {
  * posiciones aleatorias del grid en WILD, evitando pisar CORE o SCATTER,
  * y evitando repetir una posición ya convertida.
  */
-function applyCoreWildGeneration(grid: SymbolId[][], corePositions: GridPosition[]): GridPosition[] {
+export function applyCoreWildGeneration(grid: SymbolId[][], corePositions: GridPosition[]): GridPosition[] {
   const totalPositions = GRID_REELS * GRID_ROWS;
   const excluded = new Set<number>();
 
@@ -118,7 +121,18 @@ function evaluateLine(grid: SymbolId[][], line: number[], lineIndex: number, bet
   return { lineIndex, symbol: effectiveSymbol, count, win };
 }
 
-function evaluateScatter(grid: SymbolId[][], totalBet: number): { scatterCount: number; scatterWin: number; freeSpinsTriggered: boolean } {
+/** Evalúa las 12 líneas sobre un grid ya armado y devuelve las ganadoras + el total. */
+export function evaluateAllLines(grid: SymbolId[][], betPerLine: number): { lineWins: LineWin[]; totalLineWin: number } {
+  const lineWins: LineWin[] = [];
+  for (let lineIndex = 0; lineIndex < PAYLINES.length; lineIndex++) {
+    const result = evaluateLine(grid, PAYLINES[lineIndex], lineIndex, betPerLine);
+    if (result) lineWins.push(result);
+  }
+  const totalLineWin = lineWins.reduce((sum, lineWin) => sum + lineWin.win, 0);
+  return { lineWins, totalLineWin };
+}
+
+export function evaluateScatter(grid: SymbolId[][], totalBet: number): { scatterCount: number; scatterWin: number; freeSpinsTriggered: boolean } {
   let scatterCount = 0;
   for (let reel = 0; reel < GRID_REELS; reel++) {
     for (let row = 0; row < GRID_ROWS; row++) {
@@ -139,15 +153,15 @@ export function spin(betPerLine: number): SpinResult {
   const corePositions = findCorePositions(grid);
   const coreWildPositions = applyCoreWildGeneration(grid, corePositions);
 
-  const lineWins: LineWin[] = [];
-  for (let lineIndex = 0; lineIndex < PAYLINES.length; lineIndex++) {
-    const result = evaluateLine(grid, PAYLINES[lineIndex], lineIndex, betPerLine);
-    if (result) lineWins.push(result);
-  }
+  const { lineWins, totalLineWin } = evaluateAllLines(grid, betPerLine);
 
-  const totalLineWin = lineWins.reduce((sum, lineWin) => sum + lineWin.win, 0);
   const totalBet = betPerLine * PAYLINES.length;
   const { scatterCount, scatterWin, freeSpinsTriggered } = evaluateScatter(grid, totalBet);
+
+  const freeSpinsAwarded = freeSpinsTriggered ? FREE_SPINS_AWARDED : 0;
+  // El giro que activa Free Spins es base game: sus Cores NO quedan sticky (ver GDD, decisión D-05).
+  // La ronda de Free Spins arranca sin ningún Core pegado todavía.
+  const freeSpinsSession = freeSpinsTriggered ? createFreeSpinsSession(betPerLine, freeSpinsAwarded) : null;
 
   return {
     grid,
@@ -159,6 +173,7 @@ export function spin(betPerLine: number): SpinResult {
     scatterWin,
     totalWin: totalLineWin + scatterWin,
     freeSpinsTriggered,
-    freeSpinsAwarded: freeSpinsTriggered ? FREE_SPINS_AWARDED : 0,
+    freeSpinsAwarded,
+    freeSpinsSessionId: freeSpinsSession?.sessionId ?? null,
   };
 }

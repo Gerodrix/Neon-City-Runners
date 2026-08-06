@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Neon City Runners</title>
+    <style>
+      body { margin: 0; background: #0a0a12; font-family: sans-serif; color: #e0e0ff; }
+      #ui { display: flex; gap: 16px; align-items: center; padding: 12px; background: #14141f; }
+      #ui span { font-size: 14px; }
+      #spin-btn { background: #ff2e88; color: white; border: none; padding: 10px 24px; font-weight: bold; cursor: pointer; border-radius: 4px; }
+      #spin-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    </style>
+  </head>
+  <body>
+    <div id="ui">
+      <span id="balance">Saldo: 1000</span>
+      <span id="bet">Apuesta por línea: 1</span>
+      <span id="win">Último premio: 0</span>
+      <button id="spin-btn">SPIN</button>
+    </div>
+    <div id="pixi-container"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

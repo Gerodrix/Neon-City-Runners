@@ -43,6 +43,8 @@ Formato: cada Epic agrupa historias de usuario con criterios de aceptación. Los
 - **NCR-S3.1** — Como jugador, quiero ver una grilla 5x4 en pantalla al cargar el juego.
 - **NCR-S3.2** — Como jugador, quiero apretar SPIN y ver el resultado del servidor reflejado en la grilla.
 - **NCR-S3.3** — Como jugador, quiero ver mi saldo y el último premio actualizados después de cada giro.
+- **NCR-S3.4** — Como jugador, quiero que al activarse Free Spins el juego encadene los giros automáticamente, mostrando giros restantes y ganancia acumulada, sin que tenga que apretar SPIN de nuevo.
+  *Criterios de aceptación:* `SlotGame.ts` llama a `POST /free-spin` en loop hasta `sessionOver`, actualiza saldo solo al cerrar la ronda. ✅ (D-11)
 
 ---
 

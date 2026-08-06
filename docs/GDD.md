@@ -115,10 +115,10 @@ Para que la intensidad visual comunique el tamaño del premio (patrón estándar
 Toda esta sección es dirección de arte/audio a implementar — ninguno de estos elementos está construido todavía (los placeholders actuales en `SlotGame.ts` son solo rectángulos de color). Corresponde a NCR-E4 (Animaciones & FX) y NCR-E5 (UI/UX & Paytable); el audio no tiene épica propia todavía — se suma como nota para crear una si se decide encararlo.
 
 ## 8. Experiencia de usuario (estados del juego)
-1. **Base game**: grid gira, Core AI puede generar wilds, se evalúan líneas.
-2. **Trigger de Free Spins**: 3+ Scatter → transición visual (pendiente, NCR-E4) → entra a Heist mode.
-3. **Free Spins (Heist mode)**: contador de spins restantes, ganancia acumulada de la ronda visible, Cores sticky marcados visualmente (pendiente, NCR-E5).
-4. **Fin de ronda**: resumen de ganancia total de Free Spins, vuelve a base game.
+1. **Base game**: grid gira, Core AI puede generar wilds, se evalúan líneas. Implementado.
+2. **Trigger de Free Spins**: 3+ Scatter → ronda de Free Spins se juega automáticamente (D-11). Transición visual (glitch a pantalla completa) pendiente, NCR-E4 — hoy solo hay un texto de estado.
+3. **Free Spins (Heist mode)**: contador de spins restantes y ganancia acumulada de la ronda ya visibles (texto). Cores sticky marcados visualmente pendiente, NCR-E5.
+4. **Fin de ronda**: resumen de ganancia total de Free Spins ya se muestra (texto), vuelve a base game automáticamente.
 
 ## 9. Arquitectura técnica
 Ver [`docs/architecture.md`](./architecture.md) para estructura de carpetas y decisiones de implementación (RNG aislado, endpoint stateless en base game, etc.).
@@ -137,8 +137,9 @@ Ver [`docs/architecture.md`](./architecture.md) para estructura de carpetas y de
 | D-08 | En rondas avanzadas de Free Spins (muchos Cores sticky + Wilds acumulados), el grid queda dominado por Core+Wild y el premio cae fuerte en la segunda mitad de la ronda (83.8% de giros en 0 en el giro 8/8), porque el Wild no tiene tabla propia (D-02) | Dejarlo así / darle tabla de pago propia al Wild / limitar cuántos Cores pueden quedar sticky | Confirmado por simulación, patrón estable entre corridas de distinto tamaño (a diferencia del RTP total). Se decide NO corregirlo en v1 — la primera mitad de la ronda sí cumple el pilar de "progresión", y arreglarlo bien requiere rediseñar la mecánica, no un parche rápido | NCR-E6 (medido), queda en roadmap para v2 |
 | D-09 | Recalibración de reel strips (Scatter 2→1) y tabla de pagos (~1.36x sobre los valores originales) para llevar el RTP de ~140% a ~96% | Ajustar un solo parámetro a la vez / dejar el RTP original sin validar | La primera versión de la matemática sobre-pagaba; se ajustó de forma iterativa, midiendo con simulación real después de cada cambio, no a ojo | NCR-E6 |
 | D-10 | El RTP final se reporta como el resultado de agrupar 46M de giros simulados en varias corridas (96.77%), no el de una sola corrida | Confiar en el resultado de la primera corrida de 1-3M giros | Corridas individuales de 1-30M dieron entre 90% y 105% de RTP — con RNG sin seed, una sola corrida chica no alcanza para un número confiable | NCR-E6 |
+| D-11 | Los giros de Free Spins se juegan automáticamente en secuencia tras el trigger, con una pausa corta entre cada uno, sin requerir click adicional del jugador | Requerir que el jugador apriete SPIN manualmente en cada giro de la ronda de bonus | Coincide con el comportamiento estándar de slots online reales; el jugador solo interviene para iniciar la ronda | NCR-E3 |
 
-*D-04 a D-07, D-09 y D-10 implementadas. D-08 es un hallazgo confirmado por simulación, con decisión consciente de no resolverlo en v1 (ver sección 11, Fuera de alcance).*
+*D-04 a D-07, D-09, D-10 y D-11 implementadas. D-08 es un hallazgo confirmado por simulación, con decisión consciente de no resolverlo en v1 (ver sección 11, Fuera de alcance).*
 
 ## 11. Fuera de alcance para v1
 - Retrigger de Free Spins.

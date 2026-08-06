@@ -9,6 +9,7 @@
       #ui span { font-size: 14px; }
       #spin-btn { background: #ff2e88; color: white; border: none; padding: 10px 24px; font-weight: bold; cursor: pointer; border-radius: 4px; }
       #spin-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+      #fs-status { display: none; color: #33f2c7; font-weight: bold; font-size: 13px; }
     </style>
   </head>
   <body>
@@ -17,6 +18,7 @@
       <span id="bet">Apuesta por línea: 1</span>
       <span id="win">Último premio: 0</span>
       <button id="spin-btn">SPIN</button>
+      <span id="fs-status"></span>
     </div>
     <div id="pixi-container"></div>
     <script type="module" src="/src/main.ts"></script>

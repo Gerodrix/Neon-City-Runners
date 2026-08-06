@@ -25,6 +25,15 @@ interface SpinResult {
   totalWin: number;
   freeSpinsTriggered: boolean;
   freeSpinsAwarded: number;
+  freeSpinsSessionId: string | null;
+}
+
+interface FreeSpinResult {
+  grid: string[][];
+  spinWin: number;
+  sessionTotalWin: number;
+  spinsRemaining: number;
+  sessionOver: boolean;
 }
 
 export class SlotGame {
@@ -104,12 +113,71 @@ export class SlotGame {
       this.renderGrid(result.grid);
       this.balance = this.balance - this.betPerLine * 12 + result.totalWin;
       this.updateUI(result.totalWin);
+
+      if (result.freeSpinsTriggered && result.freeSpinsSessionId) {
+        await this.playFreeSpinsRound(result.freeSpinsSessionId);
+      }
     } catch (error) {
       console.error('Error al girar:', error);
     } finally {
       this.isSpinning = false;
       button.disabled = false;
     }
+  }
+
+  /**
+   * Juega automáticamente todos los giros de una ronda de Free Spins, uno tras otro,
+   * hasta que el servidor indica que la sesión terminó (D-11: sin click adicional del jugador).
+   */
+  private async playFreeSpinsRound(sessionId: string): Promise<void> {
+    this.setFreeSpinsStatus('🔓 ACCESS GRANTED — Entrando a Heist Free Spins...');
+    await this.delay(700);
+
+    while (true) {
+      const response = await fetch(`${SERVER_URL}/free-spin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId }),
+      });
+
+      if (!response.ok) {
+        console.error('Error en free-spin:', await response.text());
+        break;
+      }
+
+      const result: FreeSpinResult = await response.json();
+      console.log('Giro de Free Spins:', result);
+
+      this.renderGrid(result.grid);
+      this.setFreeSpinsStatus(
+        `HEIST MODE — Giros restantes: ${result.spinsRemaining} | Ganancia de la ronda: ${result.sessionTotalWin.toFixed(2)}`
+      );
+
+      await this.delay(800);
+
+      if (result.sessionOver) {
+        this.balance += result.sessionTotalWin;
+        this.updateUI(result.sessionTotalWin);
+        this.setFreeSpinsStatus(`Heist completado — Ganancia total: ${result.sessionTotalWin.toFixed(2)}`);
+        await this.delay(2000);
+        this.hideFreeSpinsStatus();
+        break;
+      }
+    }
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private setFreeSpinsStatus(text: string): void {
+    const el = document.getElementById('fs-status')!;
+    el.textContent = text;
+    el.style.display = 'inline';
+  }
+
+  private hideFreeSpinsStatus(): void {
+    document.getElementById('fs-status')!.style.display = 'none';
   }
 
   private updateUI(lastWin: number): void {

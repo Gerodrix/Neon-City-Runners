@@ -30,14 +30,14 @@ export interface SymbolDefinition {
 }
 
 export const SYMBOL_DEFINITIONS: Record<SymbolId, SymbolDefinition> = {
-  RUNNER: { id: 'RUNNER', name: 'Runner', isWild: false, isScatter: false, isCore: false, payout: { three: 5, four: 25, five: 100 } },
-  NETRUNNER: { id: 'NETRUNNER', name: 'Netrunner', isWild: false, isScatter: false, isCore: false, payout: { three: 4, four: 20, five: 75 } },
-  CYBERDOG: { id: 'CYBERDOG', name: 'CyberDog', isWild: false, isScatter: false, isCore: false, payout: { three: 3, four: 15, five: 50 } },
-  DRONE: { id: 'DRONE', name: 'Drone', isWild: false, isScatter: false, isCore: false, payout: { three: 2, four: 10, five: 35 } },
-  A: { id: 'A', name: 'A', isWild: false, isScatter: false, isCore: false, payout: { three: 1, four: 5, five: 20 } },
-  K: { id: 'K', name: 'K', isWild: false, isScatter: false, isCore: false, payout: { three: 1, four: 4, five: 15 } },
-  Q: { id: 'Q', name: 'Q', isWild: false, isScatter: false, isCore: false, payout: { three: 0.5, four: 3, five: 10 } },
-  J: { id: 'J', name: 'J', isWild: false, isScatter: false, isCore: false, payout: { three: 0.5, four: 2, five: 8 } },
+  RUNNER: { id: 'RUNNER', name: 'Runner', isWild: false, isScatter: false, isCore: false, payout: { three: 6.5, four: 34, five: 136 } },
+  NETRUNNER: { id: 'NETRUNNER', name: 'Netrunner', isWild: false, isScatter: false, isCore: false, payout: { three: 5.5, four: 27, five: 103 } },
+  CYBERDOG: { id: 'CYBERDOG', name: 'CyberDog', isWild: false, isScatter: false, isCore: false, payout: { three: 4.4, four: 21, five: 69 } },
+  DRONE: { id: 'DRONE', name: 'Drone', isWild: false, isScatter: false, isCore: false, payout: { three: 2.7, four: 13.6, five: 48 } },
+  A: { id: 'A', name: 'A', isWild: false, isScatter: false, isCore: false, payout: { three: 1.3, four: 6.5, five: 27 } },
+  K: { id: 'K', name: 'K', isWild: false, isScatter: false, isCore: false, payout: { three: 1.3, four: 5.5, five: 21 } },
+  Q: { id: 'Q', name: 'Q', isWild: false, isScatter: false, isCore: false, payout: { three: 0.7, four: 4.4, five: 14 } },
+  J: { id: 'J', name: 'J', isWild: false, isScatter: false, isCore: false, payout: { three: 0.7, four: 2.7, five: 11 } },
   CORE: { id: 'CORE', name: 'Core AI', isWild: false, isScatter: false, isCore: true },
   SCATTER: { id: 'SCATTER', name: 'Data Vault', isWild: false, isScatter: true, isCore: false },
   WILD: { id: 'WILD', name: 'Glitch', isWild: true, isScatter: false, isCore: false },

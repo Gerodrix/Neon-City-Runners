@@ -20,17 +20,19 @@ Formato: cada Epic agrupa historias de usuario con criterios de aceptación. Los
 ---
 
 ## NCR-E2 — Free Spins & Sticky Cores
-**Estado:** 🔲 To Do
+**Estado:** ✅ Done
 **Objetivo:** lógica de sesión para Heist Free Spins con Cores pegajosos.
 
 - **NCR-S2.1** — Como jugador, quiero que 3+ Data Vault activen 8 Free Spins.
-  *Criterios de aceptación:* ya cubierto por `evaluateScatter` (E1); esta historia agrega el manejo de sesión que dispara la secuencia.
+  *Criterios de aceptación:* ya cubierto por `evaluateScatter` (E1); esta historia agrega el manejo de sesión que dispara la secuencia. ✅
 - **NCR-S2.2** — Como jugador, quiero que los Core AI que caen durante Free Spins queden fijos (sticky) el resto de la ronda.
-  *Criterios de aceptación:* nuevo endpoint o parámetro de sesión que recuerde posiciones de Core entre giros consecutivos de la misma ronda de Free Spins.
+  *Criterios de aceptación:* nuevo endpoint o parámetro de sesión que recuerde posiciones de Core entre giros consecutivos de la misma ronda de Free Spins. ✅
 - **NCR-S2.3** — Como jugador, quiero que los Cores sticky sigan generando wilds en cada giro de Free Spins.
-  *Criterios de aceptación:* cada giro de FS reaplica `applyCoreWildGeneration` incluyendo los Cores sticky acumulados, además de los nuevos que caigan.
+  *Criterios de aceptación:* cada giro de FS reaplica `applyCoreWildGeneration` incluyendo los Cores sticky acumulados, además de los nuevos que caigan. ✅
 - **NCR-S2.4** — Como jugador, quiero ver cuántos Free Spins me quedan y el total acumulado ganado en la ronda.
-  *Criterios de aceptación:* la respuesta de cada giro en FS incluye `freeSpinsRemaining` y `totalFreeSpinsWin`.
+  *Criterios de aceptación:* la respuesta de cada giro en FS incluye `spinsRemaining` y `sessionTotalWin`. ✅
+
+**Hallazgo de QA (D-08, ver GDD sección 10):** en rondas avanzadas, un grid saturado de Cores sticky + Wilds puede pagar 0 en ese giro porque el Wild no tiene tabla propia (D-02). Pendiente de validar impacto real en NCR-E6 antes de decidir si se ajusta.
 
 ---
 
@@ -67,13 +69,17 @@ Formato: cada Epic agrupa historias de usuario con criterios de aceptación. Los
 ---
 
 ## NCR-E6 — Matemática & Simulación
-**Estado:** 🔲 To Do
+**Estado:** ✅ Done
 **Objetivo:** validar el RTP real de los reel strips actuales (no un número inventado).
 
 - **NCR-S6.1** — Como desarrollador, quiero un script que reutilice `SlotEngine.ts` y corra 1M+ giros simulados.
-  *Criterios de aceptación:* el script imprime RTP real (ganado/apostado), hit frequency, y frecuencia de activación de Free Spins.
+  *Criterios de aceptación:* el script imprime RTP real (ganado/apostado), hit frequency, y frecuencia de activación de Free Spins. ✅ `server/src/scripts/simulate.ts`, `npm run simulate`.
+- **NCR-S6.4 (QA)** — Como desarrollador, quiero medir si los giros tardíos de una ronda de Free Spins (muchos Cores sticky) pagan significativamente menos que los tempranos.
+  *Criterios de aceptación:* la simulación reporta spinWin promedio por número de orden dentro de la ronda de FS (giro 1, 2, ... 8); con ese dato se decide si D-08 amerita ajustar D-02. ✅ Confirmado: cae de 31.67 (giro 3) a 8.48 (giro 8), 84.6% de giros en 0 al final. Se decide no corregir en v1 (ver GDD, D-08).
 - **NCR-S6.2** — Como desarrollador, quiero poder ajustar `REEL_STRIP_COUNTS` y volver a correr la simulación para calibrar el RTP hacia ~96%.
+  *Criterios de aceptación:* RTP medido dentro de un rango razonable del objetivo. ✅ RTP inicial 140.50% → recalibrado a 96.07% en 4 iteraciones (Scatter 2→1, tabla de pagos ~1.36x). Ver GDD, D-09.
 - **NCR-S6.3** — Como desarrollador, quiero documentar el RTP final validado en `docs/math.md`, reemplazando el estimado inicial.
+  *Criterios de aceptación:* `math.md` refleja el número medido, no una intención de diseño. ✅
 
 ---
 

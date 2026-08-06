@@ -13,9 +13,9 @@ export const REEL_STRIP_COUNTS: Partial<Record<SymbolId, number>> = {
   A: 6,
   K: 6,
   Q: 6,
-  J: 6,
+  J: 7,
   CORE: 2,
-  SCATTER: 2,
+  SCATTER: 1,
   // WILD no está en el strip: solo lo genera el Core AI.
 };
 

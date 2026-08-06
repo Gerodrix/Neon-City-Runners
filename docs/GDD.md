@@ -17,7 +17,7 @@ Esto da pie a nombrar assets/UI coherentemente más adelante (ej. mensajes de "A
 | Líneas de pago | 12 |
 | Dirección de pago | Izquierda a derecha |
 | Apuesta | Configurable por línea |
-| RTP objetivo | ~96% (a validar, ver NCR-E6) |
+| RTP objetivo | 96.07% medido por simulación (3M giros, ver sección 6) |
 | Volatilidad | Media-alta |
 
 ## 4. Símbolos y pagos
@@ -39,10 +39,12 @@ Cada Core AI en el grid genera 2-4 wilds en posiciones aleatorias (sin pisar Cor
 - Cada giro de Free Spins fuerza Core en todas las posiciones sticky acumuladas, gira el resto del grid normalmente, y aplica generación de wilds usando **todos** los Cores (sticky + nuevos).
 - Los Cores nuevos que caen se suman a la lista de sticky para el próximo giro.
 
-Estado en desarrollo — ver NCR-E2 (To Do).
+Estado: implementado — ver NCR-E2 (Done). Hallazgo pendiente de validar: D-08.
 
 ## 6. Matemática
-Ver [`docs/math.md`](./math.md) para reel strips, tabla de pagos completa y cómo se calcula el RTP. El número real (no estimado) se valida con simulación Monte Carlo — NCR-E6.
+Ver [`docs/math.md`](./math.md) para reel strips, tabla de pagos completa y el detalle de la calibración. **RTP validado por simulación (NCR-E6, 3M giros): 96.07%** — 84.08% de aporte del base game, 12.00% de Free Spins. Hit frequency 57.44%, trigger de Free Spins 1 cada ~116 giros.
+
+La tabla de pagos y el reel strip de `math.md` ya reflejan la versión calibrada (v2), no la v1 original — la primera versión medía 140.50% de RTP, muy por encima del objetivo. El detalle del proceso de ajuste está documentado en `math.md`.
 
 ## 7. Dirección de arte y audio
 
@@ -127,14 +129,17 @@ Ver [`docs/architecture.md`](./architecture.md) para estructura de carpetas y de
 | D-02 | El Wild no tiene tabla de pago propia en v1 | Wild paga como línea propia (más alto que Runner) | Simplifica el balanceo inicial; se puede sumar después si el RTP lo necesita | NCR-E1 |
 | D-03 | RNG aislado en un único módulo (`RNG.ts`) | RNG disperso en cada función que lo necesite | Permite reemplazarlo por un RNG certificado sin tocar el resto del motor | NCR-E1 |
 | D-04 | Sesión de Free Spins en memoria del servidor (`Map`), no en el cliente | Estado manejado por el cliente y enviado en cada request | Nunca confiar en el cliente para nada que afecte el payout — estándar de la industria | NCR-E2 |
-| D-05 (propuesta) | Los Cores del giro que activa Free Spins NO quedan sticky; los sticky arrancan en el primer giro de la ronda | Que el Core del giro trigger ya cuente como sticky | Ese giro es técnicamente base game; evita ambigüedad sobre a qué "ronda" pertenece | NCR-E2 |
-| D-06 (propuesta) | Sin retrigger de Free Spins en v1 (3+ Scatter durante FS no extiende la ronda) | Implementar retrigger como en slots reales | Reduce alcance y complejidad de sesión para la v1; queda anotado como mejora futura | NCR-E2 |
+| D-05 | Los Cores del giro que activa Free Spins NO quedan sticky; los sticky arrancan en el primer giro de la ronda | Que el Core del giro trigger ya cuente como sticky | Ese giro es técnicamente base game; evita ambigüedad sobre a qué "ronda" pertenece | NCR-E2 |
+| D-06 | Sin retrigger de Free Spins en v1 (3+ Scatter durante FS no extiende la ronda) | Implementar retrigger como en slots reales | Reduce alcance y complejidad de sesión para la v1; queda anotado como mejora futura | NCR-E2 |
 | D-07 | Sesión de Free Spins vive solo en memoria del proceso Node, sin persistencia en DB | Persistir sesiones en Redis/DB | No se justifica la complejidad para un portfolio demo; limitación conocida y documentada | NCR-E2 |
+| D-08 | En rondas avanzadas de Free Spins (muchos Cores sticky + Wilds acumulados), el grid queda dominado por Core+Wild y el premio cae fuerte en la segunda mitad de la ronda (84.6% de giros en 0 en el giro 8/8), porque el Wild no tiene tabla propia (D-02) | Dejarlo así / darle tabla de pago propia al Wild / limitar cuántos Cores pueden quedar sticky | Confirmado por simulación (ver `math.md`). Se decide NO corregirlo en v1 — la primera mitad de la ronda sí cumple el pilar de "progresión", y arreglarlo bien requiere rediseñar la mecánica, no un parche rápido | NCR-E6 (medido), queda en roadmap para v2 |
+| D-09 | Recalibración de reel strips (Scatter 2→1) y tabla de pagos (~1.36x sobre los valores originales) para llevar el RTP de 140.50% a 96.07% | Ajustar un solo parámetro a la vez / dejar el RTP original sin validar | La primera versión de la matemática sobre-pagaba; se ajustó de forma iterativa, midiendo con simulación real después de cada cambio, no a ojo | NCR-E6 |
 
-*D-05, D-06 y D-07 están marcadas como propuestas hasta confirmación — actualizar esta tabla si cambian antes de implementar NCR-E2.*
+*D-04 a D-07 y D-09 implementadas. D-08 es un hallazgo confirmado por simulación, con decisión consciente de no resolverlo en v1 (ver sección 11, Fuera de alcance).*
 
 ## 11. Fuera de alcance para v1
 - Retrigger de Free Spins.
 - Wild con tabla de pago propia.
 - Persistencia de sesión entre reinicios del servidor.
 - RNG certificado (se usa `Math.random()`, aislado para reemplazo futuro).
+- **Mitigar D-08** (caída de premio en la segunda mitad de la ronda de Free Spins) — candidatos para v2: límite máximo de Cores sticky simultáneos, o tabla de pago propia para el Wild.

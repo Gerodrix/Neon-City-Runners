@@ -95,3 +95,18 @@ Formato: cada Epic agrupa historias de usuario con criterios de aceptación. Los
   *Criterios de aceptación:* deploy del frontend (ej. Vercel/Netlify) + backend (ej. Render/Railway).
 - **NCR-S7.3** — Como reclutador/evaluador, quiero entender las decisiones de diseño del juego (por qué Core AI, por qué el Wild no está en el strip, etc.).
   *Criterios de aceptación:* `docs/architecture.md` y `docs/math.md` actualizados y linkeados desde el README.
+
+---
+
+## NCR-E8 — Hardening técnico (Zero Trust real)
+**Estado:** ✅ Done
+**Objetivo:** cerrar huecos detectados al comparar contra una matriz de referencia de otro estudio/modelo — ver GDD, decisiones D-12 a D-15.
+
+- **NCR-S8.1** — Como jugador, quiero que mi saldo lo calcule y guarde el servidor, no mi navegador.
+  *Criterios de aceptación:* `PlayerBalance.ts` server-side, identificado por `playerId`; el frontend solo muestra `balance` de la respuesta, nunca lo calcula. ✅ (D-12)
+- **NCR-S8.2** — Como desarrollador, quiero que cada giro tenga un identificador único para trazabilidad.
+  *Criterios de aceptación:* `spinId` (UUID) presente en la respuesta de `/spin` y `/free-spin`. ✅ (D-13)
+- **NCR-S8.3** — Como desarrollador, quiero poder ajustar la tabla de pagos sin recompilar el backend.
+  *Criterios de aceptación:* pagos leídos desde `paytable.json`, no hardcodeados en TS. ✅ (D-14)
+- **NCR-S8.4 (decisión de no hacer)** — Evaluar si sumar cascadas/tumbling, Scatter Pays con conteo global, o multiplicadores globales acumulativos.
+  *Criterios de aceptación:* decisión documentada con motivo — son mecánicas de un género de slot distinto (ways/cluster), incompatibles con el diseño actual de 12 líneas + Core AI. No se adoptan. ✅ (D-15)

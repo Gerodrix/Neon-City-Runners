@@ -1,4 +1,6 @@
-import { Application, Container, Graphics, Text } from 'pixi.js';
+import { Application, Container, Graphics, Sprite, Text } from 'pixi.js';
+import { getSymbolTexture } from './SymbolAssets';
+import { getPlayerId } from './PlayerId';
 
 const GRID_REELS = 5;
 const GRID_ROWS = 4;
@@ -21,28 +23,36 @@ const SYMBOL_COLORS: Record<string, number> = {
 };
 
 interface SpinResult {
+  spinId: string;
   grid: string[][];
   totalWin: number;
   freeSpinsTriggered: boolean;
   freeSpinsAwarded: number;
   freeSpinsSessionId: string | null;
+  balance: number;
 }
 
 interface FreeSpinResult {
+  spinId: string;
   grid: string[][];
   spinWin: number;
   sessionTotalWin: number;
   spinsRemaining: number;
   sessionOver: boolean;
+  balance: number;
 }
 
 export class SlotGame {
   private gridContainer: Container;
-  private balance = 1000;
+  // El saldo que se ve en pantalla es siempre el que devuelve el servidor
+  // (ver server/src/slot/PlayerBalance.ts) — el cliente nunca lo calcula.
+  private balance = 0;
+  private playerId: string;
   private betPerLine = 1;
   private isSpinning = false;
 
   constructor(private app: Application) {
+    this.playerId = getPlayerId();
     this.gridContainer = new Container();
     this.gridContainer.x = 40;
     this.gridContainer.y = 40;
@@ -50,6 +60,19 @@ export class SlotGame {
 
     this.drawEmptyGrid();
     this.bindSpinButton();
+    this.loadInitialBalance();
+  }
+
+  private async loadInitialBalance(): Promise<void> {
+    try {
+      const response = await fetch(`${SERVER_URL}/balance?playerId=${this.playerId}`);
+      if (!response.ok) throw new Error(`Error del servidor: ${response.status}`);
+      const data: { balance: number } = await response.json();
+      this.balance = data.balance;
+      this.updateUI(0);
+    } catch (error) {
+      console.error('Error al obtener el saldo inicial:', error);
+    }
   }
 
   private drawEmptyGrid(): void {
@@ -71,8 +94,19 @@ export class SlotGame {
     for (let reel = 0; reel < GRID_REELS; reel++) {
       for (let row = 0; row < GRID_ROWS; row++) {
         const symbol = grid[reel][row];
-        const color = SYMBOL_COLORS[symbol] ?? 0x444455;
+        const texture = getSymbolTexture(symbol);
 
+        if (texture) {
+          const sprite = new Sprite(texture);
+          sprite.width = CELL_SIZE - 8;
+          sprite.height = CELL_SIZE - 8;
+          sprite.x = reel * CELL_SIZE;
+          sprite.y = row * CELL_SIZE;
+          this.gridContainer.addChild(sprite);
+          continue;
+        }
+
+        const color = SYMBOL_COLORS[symbol] ?? 0x444455;
         const cell = new Graphics()
           .rect(0, 0, CELL_SIZE - 8, CELL_SIZE - 8)
           .fill({ color });
@@ -102,16 +136,19 @@ export class SlotGame {
       const response = await fetch(`${SERVER_URL}/spin`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ betPerLine: this.betPerLine }),
+        body: JSON.stringify({ betPerLine: this.betPerLine, playerId: this.playerId }),
       });
 
-      if (!response.ok) throw new Error(`Error del servidor: ${response.status}`);
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({ error: 'Error desconocido' }));
+        throw new Error(errorBody.error ?? `Error del servidor: ${response.status}`);
+      }
 
       const result: SpinResult = await response.json();
       console.log('Resultado del giro:', result);
 
       this.renderGrid(result.grid);
-      this.balance = this.balance - this.betPerLine * 12 + result.totalWin;
+      this.balance = result.balance; // saldo autoritativo del servidor, no calculado acá
       this.updateUI(result.totalWin);
 
       if (result.freeSpinsTriggered && result.freeSpinsSessionId) {
@@ -119,6 +156,9 @@ export class SlotGame {
       }
     } catch (error) {
       console.error('Error al girar:', error);
+      this.setFreeSpinsStatus(error instanceof Error ? error.message : 'Error al girar');
+      await this.delay(2000);
+      this.hideFreeSpinsStatus();
     } finally {
       this.isSpinning = false;
       button.disabled = false;
@@ -149,6 +189,7 @@ export class SlotGame {
       console.log('Giro de Free Spins:', result);
 
       this.renderGrid(result.grid);
+      this.balance = result.balance; // saldo autoritativo del servidor, se va acreditando giro a giro
       this.setFreeSpinsStatus(
         `HEIST MODE — Giros restantes: ${result.spinsRemaining} | Ganancia de la ronda: ${result.sessionTotalWin.toFixed(2)}`
       );
@@ -156,7 +197,6 @@ export class SlotGame {
       await this.delay(800);
 
       if (result.sessionOver) {
-        this.balance += result.sessionTotalWin;
         this.updateUI(result.sessionTotalWin);
         this.setFreeSpinsStatus(`Heist completado — Ganancia total: ${result.sessionTotalWin.toFixed(2)}`);
         await this.delay(2000);

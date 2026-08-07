@@ -9,12 +9,19 @@ import { spin } from '../slot/SlotEngine.js';
 import { spinFreeSpins } from '../slot/FreeSpinsLogic.js';
 import { PAYLINES } from '../slot/Paylines.js';
 import { FREE_SPINS_AWARDED } from '../config/SlotConfig.js';
+import { adjustBalance } from '../slot/PlayerBalance.js';
 
 const BET_PER_LINE = 1;
 const BET_PER_BASE_SPIN = BET_PER_LINE * PAYLINES.length;
 
 const spinCountArg = Number(process.argv[2]);
 const SPIN_COUNT = Number.isFinite(spinCountArg) && spinCountArg > 0 ? spinCountArg : 1_000_000;
+
+// La simulación es un jugador simulado con saldo "infinito" para que el chequeo
+// de saldo real (Zero Trust) no corte la corrida — el objeto de esto es medir
+// matemática, no probar el flujo de fondos (eso se prueba aparte, con saldo normal).
+const SIMULATED_PLAYER_ID = 'simulation-player';
+adjustBalance(SIMULATED_PLAYER_ID, 1_000_000_000_000);
 
 let totalBet = 0;
 let totalWin = 0;
@@ -32,7 +39,13 @@ const startedAt = Date.now();
 for (let i = 0; i < SPIN_COUNT; i++) {
   totalBet += BET_PER_BASE_SPIN;
 
-  const result = spin(BET_PER_LINE);
+  const response = spin(BET_PER_LINE, SIMULATED_PLAYER_ID);
+  if (!response.ok) {
+    console.error('Giro rechazado inesperadamente (saldo):', response.error);
+    break;
+  }
+  const result = response.result;
+
   totalWin += result.totalWin;
   if (result.totalWin > 0) baseWinningSpins++;
 
@@ -41,18 +54,18 @@ for (let i = 0; i < SPIN_COUNT; i++) {
     let position = 0;
 
     while (true) {
-      const response = spinFreeSpins(result.freeSpinsSessionId);
-      if (!response.ok) break; // no debería pasar; corta por seguridad
+      const fsResponse = spinFreeSpins(result.freeSpinsSessionId);
+      if (!fsResponse.ok) break; // no debería pasar; corta por seguridad
 
-      totalWin += response.result.spinWin; // los giros de FS no cuestan apuesta nueva
-      freeSpinsWinTotal += response.result.spinWin;
+      totalWin += fsResponse.result.spinWin; // los giros de FS no cuestan apuesta nueva
+      freeSpinsWinTotal += fsResponse.result.spinWin;
 
-      winByPositionSum[position] += response.result.spinWin;
+      winByPositionSum[position] += fsResponse.result.spinWin;
       winByPositionCount[position]++;
-      if (response.result.spinWin === 0) zeroWinByPositionCount[position]++;
+      if (fsResponse.result.spinWin === 0) zeroWinByPositionCount[position]++;
 
       position++;
-      if (response.result.sessionOver) break;
+      if (fsResponse.result.sessionOver) break;
     }
   }
 }

@@ -121,7 +121,10 @@ Toda esta sección es dirección de arte/audio a implementar — ninguno de esto
 4. **Fin de ronda**: resumen de ganancia total de Free Spins ya se muestra (texto), vuelve a base game automáticamente.
 
 ## 9. Arquitectura técnica
-Ver [`docs/architecture.md`](./architecture.md) para estructura de carpetas y decisiones de implementación (RNG aislado, endpoint stateless en base game, etc.).
+Ver [`docs/architecture.md`](./architecture.md) para estructura de carpetas y decisiones de implementación (RNG aislado, endpoint stateless en base game, etc.). Piezas sumadas después de la primera versión: `PlayerBalance.ts` (saldo server-side, D-12), `spinId` por giro (D-13), `paytable.json` externalizado (D-14), y en el frontend `SymbolAssets.ts` (carga de sprites finales con fallback automático al placeholder — ver `client/public/assets/symbols/README.md` para el brief de producción de arte).
+
+## 9.1 Brief de producción de arte (para Figma)
+El pipeline de assets ya está armado: cualquier PNG que se agregue en `client/public/assets/symbols/` con el nombre exacto del símbolo (ej. `RUNNER.png`) reemplaza el placeholder de color automáticamente, sin tocar código. Especificación completa (formato, tamaño, nomenclatura) en `client/public/assets/symbols/README.md`. Referencia de estilo: sección 10 de este documento.
 
 ## 10. Registro de decisiones de diseño
 
@@ -138,8 +141,12 @@ Ver [`docs/architecture.md`](./architecture.md) para estructura de carpetas y de
 | D-09 | Recalibración de reel strips (Scatter 2→1) y tabla de pagos (~1.36x sobre los valores originales) para llevar el RTP de ~140% a ~96% | Ajustar un solo parámetro a la vez / dejar el RTP original sin validar | La primera versión de la matemática sobre-pagaba; se ajustó de forma iterativa, midiendo con simulación real después de cada cambio, no a ojo | NCR-E6 |
 | D-10 | El RTP final se reporta como el resultado de agrupar 46M de giros simulados en varias corridas (96.77%), no el de una sola corrida | Confiar en el resultado de la primera corrida de 1-3M giros | Corridas individuales de 1-30M dieron entre 90% y 105% de RTP — con RNG sin seed, una sola corrida chica no alcanza para un número confiable | NCR-E6 |
 | D-11 | Los giros de Free Spins se juegan automáticamente en secuencia tras el trigger, con una pausa corta entre cada uno, sin requerir click adicional del jugador | Requerir que el jugador apriete SPIN manualmente en cada giro de la ronda de bonus | Coincide con el comportamiento estándar de slots online reales; el jugador solo interviene para iniciar la ronda | NCR-E3 |
+| D-12 | El saldo del jugador se calcula y guarda únicamente en el servidor (`PlayerBalance.ts`), identificado por un `playerId` que genera el cliente. El frontend nunca hace la cuenta, solo muestra el `balance` que le devuelve cada respuesta | Calcular el saldo en el frontend (como estaba hasta ahora) | Hallazgo real al comparar con una matriz de referencia de otro modelo: calcular el saldo en el cliente contradecía el "Zero Trust" que ya aplicábamos al resto del motor — cualquiera podía editarlo por consola | NCR-E3 |
+| D-13 | Cada giro (base y Free Spins) devuelve un `spinId` único (UUID) | No identificar los giros individualmente | Necesario para trazabilidad/auditoría en un sistema real — barato de agregar, buena práctica estándar de la industria | NCR-E1/E2 |
+| D-14 | La tabla de pagos vive en `paytable.json` (config externa), no hardcodeada en el código TypeScript | Dejarla hardcodeada en `Symbol.ts` como estaba | Un motor de slots real necesita poder ajustar pagos sin recompilar; separa configuración de lógica | NCR-E1 |
+| D-15 | No se adoptan mecánicas de cascadas (tumbling), Scatter Pays con conteo global, ni multiplicadores globales acumulativos, aunque aparecen en una matriz de referencia de otro estudio/modelo | Rediseñar el juego para incluirlas | Son mecánicas de un género de slot distinto (ways/cluster) — incompatibles con el diseño de 12 líneas fijas + Core AI ya definido; adoptarlas sería un juego nuevo, no una mejora incremental | — |
 
-*D-04 a D-07, D-09, D-10 y D-11 implementadas. D-08 es un hallazgo confirmado por simulación, con decisión consciente de no resolverlo en v1 (ver sección 11, Fuera de alcance).*
+*D-04 a D-07, D-09 a D-15 implementadas (D-15 es una decisión de "no hacer", documentada igual). D-08 es un hallazgo confirmado por simulación, con decisión consciente de no resolverlo en v1 (ver sección 11, Fuera de alcance).*
 
 ## 11. Fuera de alcance para v1
 - Retrigger de Free Spins.

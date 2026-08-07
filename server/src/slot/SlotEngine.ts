@@ -17,6 +17,8 @@ export interface LineWin {
   symbol: SymbolId;
   count: number;
   win: number;
+  /** Celdas exactas que formaron la combinación, para que el frontend las resalte sin recalcular nada. */
+  positions: GridPosition[];
 }
 
 export interface SpinResult {
@@ -127,7 +129,9 @@ function evaluateLine(grid: SymbolId[][], line: number[], lineIndex: number, bet
   const payoutKey = count === 3 ? 'three' : count === 4 ? 'four' : 'five';
   const win = definition.payout[payoutKey] * betPerLine;
 
-  return { lineIndex, symbol: effectiveSymbol, count, win };
+  const positions: GridPosition[] = line.slice(0, count).map((row, reel) => ({ reel, row }));
+
+  return { lineIndex, symbol: effectiveSymbol, count, win, positions };
 }
 
 /** Evalúa las 12 líneas sobre un grid ya armado y devuelve las ganadoras + el total. */

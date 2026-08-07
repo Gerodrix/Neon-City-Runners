@@ -49,13 +49,17 @@ Formato: cada Epic agrupa historias de usuario con criterios de aceptación. Los
 ---
 
 ## NCR-E4 — Animaciones & FX
-**Estado:** 🔲 To Do
+**Estado:** 🟡 En progreso (primera pasada con placeholders — falta la transición de salida y ajustar sobre arte real)
 **Objetivo:** feedback visual — sin esto el juego "funciona" pero no se siente un slot real.
 
 - **NCR-S4.1** — Como jugador, quiero ver los rodillos girar antes de que se detengan en el resultado (no que el grid cambie instantáneo).
+  *Criterios de aceptación:* cada rodillo cicla símbolos aleatorios y para en cascada (reel 0 primero). ✅ `animateSpinAndReveal` / `spinReelColumn`.
 - **NCR-S4.2** — Como jugador, quiero ver un highlight visual sobre las líneas ganadoras.
+  *Criterios de aceptación:* glow pulsante sobre las celdas exactas de cada línea ganadora. ✅ `highlightWinningLines`, requirió agregar `positions` a `LineWin` en el backend (D-18).
 - **NCR-S4.3** — Como jugador, quiero ver una animación/glow cuando aparece un wild generado por Core AI.
+  *Criterios de aceptación:* pulso en el Core, efecto glitch (parpadeo de colores) en cada Wild generado antes de asentarse. ✅ `pulseCore` / `glitchFlicker`.
 - **NCR-S4.4** — Como jugador, quiero una transición visual clara al entrar y salir de Free Spins.
+  *Criterios de aceptación:* overlay "ACCESS GRANTED" con glitch al activar. ✅ Entrada implementada (`showAccessGrantedOverlay`); transición de salida (fin de ronda) queda con el texto de resumen actual, sin efecto visual dedicado — pendiente.
 
 ---
 

@@ -1,6 +1,7 @@
 import { Application, Container, Graphics, Sprite, Text } from 'pixi.js';
 import { getSymbolTexture } from './SymbolAssets';
 import { getPlayerId } from './PlayerId';
+import { tweenValue, delay, Easing } from './Tween';
 
 const GRID_REELS = 5;
 const GRID_ROWS = 4;
@@ -22,9 +23,28 @@ const SYMBOL_COLORS: Record<string, number> = {
   WILD: 0xff0055,
 };
 
+// Símbolos que se usan para el "blur" de giro — cualquiera de estos, es solo cosmético.
+const SPIN_CYCLE_POOL = Object.keys(SYMBOL_COLORS);
+
+interface GridPosition {
+  reel: number;
+  row: number;
+}
+
+interface LineWin {
+  lineIndex: number;
+  symbol: string;
+  count: number;
+  win: number;
+  positions: GridPosition[];
+}
+
 interface SpinResult {
   spinId: string;
   grid: string[][];
+  corePositions: GridPosition[];
+  coreWildPositions: GridPosition[];
+  lineWins: LineWin[];
   totalWin: number;
   freeSpinsTriggered: boolean;
   freeSpinsAwarded: number;
@@ -35,6 +55,9 @@ interface SpinResult {
 interface FreeSpinResult {
   spinId: string;
   grid: string[][];
+  corePositions: GridPosition[];
+  coreWildPositions: GridPosition[];
+  lineWins: LineWin[];
   spinWin: number;
   sessionTotalWin: number;
   spinsRemaining: number;
@@ -44,12 +67,18 @@ interface FreeSpinResult {
 
 export class SlotGame {
   private gridContainer: Container;
+  private fxLayer: Container;
+  // Contenedores persistentes por celda — se actualizan in-place, nunca se destruyen,
+  // así se puede animar cada rodillo por separado sin reconstruir todo el grid.
+  private cellContainers: Container[][] = [];
+
   // El saldo que se ve en pantalla es siempre el que devuelve el servidor
   // (ver server/src/slot/PlayerBalance.ts) — el cliente nunca lo calcula.
   private balance = 0;
   private playerId: string;
   private betPerLine = 1;
   private isSpinning = false;
+  private wasInsufficientFunds = false;
 
   constructor(private app: Application) {
     this.playerId = getPlayerId();
@@ -58,8 +87,12 @@ export class SlotGame {
     this.gridContainer.y = 40;
     this.app.stage.addChild(this.gridContainer);
 
-    this.drawEmptyGrid();
+    this.fxLayer = new Container();
+    this.gridContainer.addChild(this.fxLayer); // mismas coordenadas que las celdas, se dibuja arriba
+
+    this.buildGridCells();
     this.bindSpinButton();
+    this.bindTopupButton();
     this.loadInitialBalance();
   }
 
@@ -70,57 +103,220 @@ export class SlotGame {
       const data: { balance: number } = await response.json();
       this.balance = data.balance;
       this.updateUI(0);
+      this.refreshSpinAvailability();
     } catch (error) {
       console.error('Error al obtener el saldo inicial:', error);
     }
   }
 
-  private drawEmptyGrid(): void {
-    this.gridContainer.removeChildren();
+  private bindTopupButton(): void {
+    const button = document.getElementById('topup-btn') as HTMLButtonElement;
+    button.addEventListener('click', async () => {
+      try {
+        const response = await fetch(`${SERVER_URL}/balance/topup`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ playerId: this.playerId }),
+        });
+        if (!response.ok) throw new Error(`Error del servidor: ${response.status}`);
+        const data: { balance: number } = await response.json();
+        this.balance = data.balance;
+        this.updateUI(0);
+        this.refreshSpinAvailability();
+      } catch (error) {
+        console.error('Error al recargar saldo:', error);
+      }
+    });
+  }
+
+  private refreshSpinAvailability(): void {
+    const button = document.getElementById('spin-btn') as HTMLButtonElement;
+    const totalBet = this.betPerLine * 12;
+    const insufficientNow = this.balance < totalBet;
+
+    if (insufficientNow) {
+      button.disabled = true;
+      this.setFreeSpinsStatus('💸 Saldo insuficiente para girar — usá "+1000 (demo)" para recargar');
+    } else {
+      if (!this.isSpinning) button.disabled = false;
+      if (this.wasInsufficientFunds) this.hideFreeSpinsStatus();
+    }
+
+    this.wasInsufficientFunds = insufficientNow;
+  }
+
+  // ---------- Grid: construcción y dibujo de celdas ----------
+
+  private buildGridCells(): void {
     for (let reel = 0; reel < GRID_REELS; reel++) {
+      this.cellContainers[reel] = [];
       for (let row = 0; row < GRID_ROWS; row++) {
-        const cell = new Graphics()
-          .rect(0, 0, CELL_SIZE - 8, CELL_SIZE - 8)
-          .fill({ color: 0x1a1a2a });
+        const cell = new Container();
         cell.x = reel * CELL_SIZE;
         cell.y = row * CELL_SIZE;
-        this.gridContainer.addChild(cell);
+        this.gridContainer.addChildAt(cell, 0); // debajo del fxLayer
+        this.cellContainers[reel][row] = cell;
+        this.setCellSymbol(reel, row, null);
       }
     }
   }
 
-  private renderGrid(grid: string[][]): void {
-    this.gridContainer.removeChildren();
-    for (let reel = 0; reel < GRID_REELS; reel++) {
-      for (let row = 0; row < GRID_ROWS; row++) {
-        const symbol = grid[reel][row];
-        const texture = getSymbolTexture(symbol);
+  /** Dibuja el contenido de una celda in-place: sprite real si existe, si no el placeholder de color. */
+  private setCellSymbol(reel: number, row: number, symbol: string | null): void {
+    const cell = this.cellContainers[reel][row];
+    cell.removeChildren();
 
-        if (texture) {
-          const sprite = new Sprite(texture);
-          sprite.width = CELL_SIZE - 8;
-          sprite.height = CELL_SIZE - 8;
-          sprite.x = reel * CELL_SIZE;
-          sprite.y = row * CELL_SIZE;
-          this.gridContainer.addChild(sprite);
-          continue;
+    if (!symbol) {
+      cell.addChild(new Graphics().rect(0, 0, CELL_SIZE - 8, CELL_SIZE - 8).fill({ color: 0x1a1a2a }));
+      return;
+    }
+
+    const texture = getSymbolTexture(symbol);
+    if (texture) {
+      const sprite = new Sprite(texture);
+      sprite.width = CELL_SIZE - 8;
+      sprite.height = CELL_SIZE - 8;
+      cell.addChild(sprite);
+      return;
+    }
+
+    const color = SYMBOL_COLORS[symbol] ?? 0x444455;
+    cell.addChild(new Graphics().rect(0, 0, CELL_SIZE - 8, CELL_SIZE - 8).fill({ color }));
+    const label = new Text({ text: symbol, style: { fontSize: 12, fill: 0xffffff } });
+    label.x = 6;
+    label.y = 6;
+    cell.addChild(label);
+  }
+
+  private randomSpinSymbol(): string {
+    return SPIN_CYCLE_POOL[Math.floor(Math.random() * SPIN_CYCLE_POOL.length)];
+  }
+
+  // ---------- Animación de giro ----------
+
+  /**
+   * Gira los 5 rodillos con un "blur" de símbolos aleatorios y los va deteniendo
+   * en cascada (cada rodillo para un poco después que el anterior), hasta asentarse
+   * en el resultado real que ya vino del servidor.
+   */
+  private async animateSpinAndReveal(finalGrid: string[][]): Promise<void> {
+    const reelPromises = Array.from({ length: GRID_REELS }, (_, reel) => {
+      const reelDurationMs = 450 + reel * 150; // cascada: reel 0 para primero, reel 4 último
+      return this.spinReelColumn(reel, finalGrid, reelDurationMs);
+    });
+    await Promise.all(reelPromises);
+  }
+
+  private spinReelColumn(reel: number, finalGrid: string[][], durationMs: number): Promise<void> {
+    const cycleIntervalMs = 55;
+
+    return new Promise((resolve) => {
+      const startedAt = performance.now();
+
+      const cycle = () => {
+        const elapsed = performance.now() - startedAt;
+
+        if (elapsed >= durationMs) {
+          for (let row = 0; row < GRID_ROWS; row++) {
+            this.setCellSymbol(reel, row, finalGrid[reel][row]);
+          }
+          resolve();
+          return;
         }
 
-        const color = SYMBOL_COLORS[symbol] ?? 0x444455;
-        const cell = new Graphics()
-          .rect(0, 0, CELL_SIZE - 8, CELL_SIZE - 8)
-          .fill({ color });
-        cell.x = reel * CELL_SIZE;
-        cell.y = row * CELL_SIZE;
-        this.gridContainer.addChild(cell);
+        for (let row = 0; row < GRID_ROWS; row++) {
+          this.setCellSymbol(reel, row, this.randomSpinSymbol());
+        }
+        setTimeout(cycle, cycleIntervalMs);
+      };
 
-        const label = new Text({ text: symbol, style: { fontSize: 12, fill: 0xffffff } });
-        label.x = cell.x + 6;
-        label.y = cell.y + 6;
-        this.gridContainer.addChild(label);
+      cycle();
+    });
+  }
+
+  // ---------- Efectos: líneas ganadoras, Core AI, Wilds ----------
+
+  private async highlightWinningLines(lineWins: LineWin[]): Promise<void> {
+    if (lineWins.length === 0) return;
+
+    const glowRects: Graphics[] = [];
+    for (const lineWin of lineWins) {
+      for (const pos of lineWin.positions) {
+        const glow = new Graphics().rect(-4, -4, CELL_SIZE, CELL_SIZE).stroke({ width: 4, color: 0xff2e88 });
+        glow.x = pos.reel * CELL_SIZE;
+        glow.y = pos.row * CELL_SIZE;
+        glow.alpha = 0;
+        this.fxLayer.addChild(glow);
+        glowRects.push(glow);
       }
     }
+
+    await tweenValue(0, 1, 200, (v) => glowRects.forEach((g) => (g.alpha = v)));
+    await delay(500);
+    await tweenValue(1, 0, 300, (v) => glowRects.forEach((g) => (g.alpha = v)));
+
+    glowRects.forEach((g) => this.fxLayer.removeChild(g));
   }
+
+  private async pulseCore(pos: GridPosition): Promise<void> {
+    const ring = new Graphics().rect(0, 0, CELL_SIZE - 8, CELL_SIZE - 8).stroke({ width: 4, color: 0x00ffaa });
+    ring.x = pos.reel * CELL_SIZE;
+    ring.y = pos.row * CELL_SIZE;
+    this.fxLayer.addChild(ring);
+
+    await tweenValue(1, 0, 550, (v) => (ring.alpha = v), Easing.linear);
+    this.fxLayer.removeChild(ring);
+  }
+
+  /** Efecto glitch: la celda parpadea entre colores antes de asentarse en su símbolo final (el Wild). */
+  private async glitchFlicker(pos: GridPosition, finalSymbol: string): Promise<void> {
+    const flickerColors = [0xffffff, 0x33f2c7, 0xff2e88, 0x0a0a12];
+    const cell = this.cellContainers[pos.reel][pos.row];
+
+    for (let i = 0; i < 5; i++) {
+      cell.removeChildren();
+      cell.addChild(new Graphics().rect(0, 0, CELL_SIZE - 8, CELL_SIZE - 8).fill({ color: flickerColors[i % flickerColors.length] }));
+      await delay(45);
+    }
+
+    this.setCellSymbol(pos.reel, pos.row, finalSymbol);
+  }
+
+  private async playCoreEffects(corePositions: GridPosition[], coreWildPositions: GridPosition[]): Promise<void> {
+    if (corePositions.length === 0 && coreWildPositions.length === 0) return;
+
+    await Promise.all([
+      ...corePositions.map((pos) => this.pulseCore(pos)),
+      ...coreWildPositions.map((pos) => this.glitchFlicker(pos, 'WILD')),
+    ]);
+  }
+
+  private async showAccessGrantedOverlay(): Promise<void> {
+    const text = new Text({
+      text: 'ACCESS GRANTED',
+      style: { fontSize: 40, fontWeight: 'bold', fill: 0x33f2c7, stroke: { color: 0xff2e88, width: 3 } },
+    });
+    text.anchor.set(0.5);
+    text.x = this.app.screen.width / 2;
+    text.y = this.app.screen.height / 2;
+    text.alpha = 0;
+    this.app.stage.addChild(text);
+
+    // Glitch corto antes de asentarse — tironeo horizontal + parpadeo.
+    for (let i = 0; i < 5; i++) {
+      text.x = this.app.screen.width / 2 + (Math.random() - 0.5) * 24;
+      text.alpha = Math.random() > 0.25 ? 1 : 0;
+      await delay(55);
+    }
+    text.x = this.app.screen.width / 2;
+    text.alpha = 1;
+
+    await delay(700);
+    await tweenValue(1, 0, 400, (v) => (text.alpha = v));
+    this.app.stage.removeChild(text);
+  }
+
+  // ---------- Flujo principal ----------
 
   private bindSpinButton(): void {
     const button = document.getElementById('spin-btn') as HTMLButtonElement;
@@ -147,22 +343,37 @@ export class SlotGame {
       const result: SpinResult = await response.json();
       console.log('Resultado del giro:', result);
 
-      this.renderGrid(result.grid);
+      await this.animateSpinAndReveal(result.grid);
+
       this.balance = result.balance; // saldo autoritativo del servidor, no calculado acá
       this.updateUI(result.totalWin);
+      this.refreshSpinAvailability();
+
+      await this.highlightWinningLines(result.lineWins);
+      await this.playCoreEffects(result.corePositions, result.coreWildPositions);
 
       if (result.freeSpinsTriggered && result.freeSpinsSessionId) {
+        await this.showAccessGrantedOverlay();
         await this.playFreeSpinsRound(result.freeSpinsSessionId);
       }
     } catch (error) {
       console.error('Error al girar:', error);
-      this.setFreeSpinsStatus(error instanceof Error ? error.message : 'Error al girar');
-      await this.delay(2000);
-      this.hideFreeSpinsStatus();
+      const message = error instanceof Error ? error.message : 'Error al girar';
+      this.setFreeSpinsStatus(`⚠️ ${message}`);
+
+      if (message !== 'Saldo insuficiente') {
+        this.delay2500ThenHideIfNotInsufficient();
+      }
     } finally {
       this.isSpinning = false;
-      button.disabled = false;
+      this.refreshSpinAvailability();
     }
+  }
+
+  private delay2500ThenHideIfNotInsufficient(): void {
+    delay(2500).then(() => {
+      if (!this.wasInsufficientFunds) this.hideFreeSpinsStatus();
+    });
   }
 
   /**
@@ -170,9 +381,6 @@ export class SlotGame {
    * hasta que el servidor indica que la sesión terminó (D-11: sin click adicional del jugador).
    */
   private async playFreeSpinsRound(sessionId: string): Promise<void> {
-    this.setFreeSpinsStatus('🔓 ACCESS GRANTED — Entrando a Heist Free Spins...');
-    await this.delay(700);
-
     while (true) {
       const response = await fetch(`${SERVER_URL}/free-spin`, {
         method: 'POST',
@@ -188,26 +396,27 @@ export class SlotGame {
       const result: FreeSpinResult = await response.json();
       console.log('Giro de Free Spins:', result);
 
-      this.renderGrid(result.grid);
-      this.balance = result.balance; // saldo autoritativo del servidor, se va acreditando giro a giro
+      await this.animateSpinAndReveal(result.grid);
+
+      this.balance = result.balance;
       this.setFreeSpinsStatus(
         `HEIST MODE — Giros restantes: ${result.spinsRemaining} | Ganancia de la ronda: ${result.sessionTotalWin.toFixed(2)}`
       );
 
-      await this.delay(800);
+      await this.highlightWinningLines(result.lineWins);
+      await this.playCoreEffects(result.corePositions, result.coreWildPositions);
 
       if (result.sessionOver) {
+        this.balance = result.balance;
         this.updateUI(result.sessionTotalWin);
         this.setFreeSpinsStatus(`Heist completado — Ganancia total: ${result.sessionTotalWin.toFixed(2)}`);
-        await this.delay(2000);
+        await delay(2000);
         this.hideFreeSpinsStatus();
         break;
       }
-    }
-  }
 
-  private delay(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+      await delay(300);
+    }
   }
 
   private setFreeSpinsStatus(text: string): void {

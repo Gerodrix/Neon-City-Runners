@@ -115,9 +115,9 @@ Para que la intensidad visual comunique el tamaño del premio (patrón estándar
 Toda esta sección es dirección de arte/audio a implementar — ninguno de estos elementos está construido todavía (los placeholders actuales en `SlotGame.ts` son solo rectángulos de color). Corresponde a NCR-E4 (Animaciones & FX) y NCR-E5 (UI/UX & Paytable); el audio no tiene épica propia todavía — se suma como nota para crear una si se decide encararlo.
 
 ## 8. Experiencia de usuario (estados del juego)
-1. **Base game**: grid gira, Core AI puede generar wilds, se evalúan líneas. Implementado.
-2. **Trigger de Free Spins**: 3+ Scatter → ronda de Free Spins se juega automáticamente (D-11). Transición visual (glitch a pantalla completa) pendiente, NCR-E4 — hoy solo hay un texto de estado.
-3. **Free Spins (Heist mode)**: contador de spins restantes y ganancia acumulada de la ronda ya visibles (texto). Cores sticky marcados visualmente pendiente, NCR-E5.
+1. **Base game**: rodillos giran con blur de símbolos y se detienen en cascada (reel 0 primero, reel 4 último), líneas ganadoras se resaltan con glow, Core AI pulsa y cada Wild generado aparece con un efecto glitch. Implementado (NCR-E4, primera pasada).
+2. **Trigger de Free Spins**: 3+ Scatter → overlay "ACCESS GRANTED" con glitch de pantalla completa → ronda se juega automáticamente (D-11). Implementado.
+3. **Free Spins (Heist mode)**: contador de spins restantes y ganancia acumulada visibles (texto), mismos efectos de giro/líneas/Core AI que el base game. Cores sticky con marca visual distintiva pendiente — se diseña junto con el arte final (NCR-E5), no tiene sentido definirla sobre placeholders.
 4. **Fin de ronda**: resumen de ganancia total de Free Spins ya se muestra (texto), vuelve a base game automáticamente.
 
 ## 9. Arquitectura técnica
@@ -145,8 +145,11 @@ El pipeline de assets ya está armado: cualquier PNG que se agregue en `client/p
 | D-13 | Cada giro (base y Free Spins) devuelve un `spinId` único (UUID) | No identificar los giros individualmente | Necesario para trazabilidad/auditoría en un sistema real — barato de agregar, buena práctica estándar de la industria | NCR-E1/E2 |
 | D-14 | La tabla de pagos vive en `paytable.json` (config externa), no hardcodeada en el código TypeScript | Dejarla hardcodeada en `Symbol.ts` como estaba | Un motor de slots real necesita poder ajustar pagos sin recompilar; separa configuración de lógica | NCR-E1 |
 | D-15 | No se adoptan mecánicas de cascadas (tumbling), Scatter Pays con conteo global, ni multiplicadores globales acumulativos, aunque aparecen en una matriz de referencia de otro estudio/modelo | Rediseñar el juego para incluirlas | Son mecánicas de un género de slot distinto (ways/cluster) — incompatibles con el diseño de 12 líneas fijas + Core AI ya definido; adoptarlas sería un juego nuevo, no una mejora incremental | — |
+| D-16 | Se agrega un endpoint `POST /balance/topup` (+1000) para poder probar el flujo de saldo insuficiente sin esperar una racha perdedora larga | No tener forma de recargar, o simular pérdidas manualmente | Es una herramienta de desarrollo/demo — no existiría en un sistema real con dinero. Validado manualmente que editar el saldo por consola del navegador (F12) no tiene efecto: el próximo giro lo pisa con el valor real del servidor | NCR-E8 |
+| D-17 | Las animaciones usan un helper de tweening propio (`Tween.ts`, ~40 líneas sobre el Ticker de PixiJS), no una librería externa (GSAP, etc.) | Sumar una dependencia de animación | El proyecto no necesita curvas de easing avanzadas ni timelines complejos — un helper propio mantiene el bundle liviano sin sacrificar lo que se necesita | NCR-E4 |
+| D-18 | El servidor devuelve las posiciones exactas (`positions`) de cada línea ganadora, no solo símbolo/cantidad | Que el frontend duplique la definición de `PAYLINES` para calcular qué celdas resaltar | Evita que cliente y servidor puedan desincronizarse si `PAYLINES` cambia — el cliente nunca recalcula nada, solo dibuja lo que el servidor ya resolvió | NCR-E1/E4 |
 
-*D-04 a D-07, D-09 a D-15 implementadas (D-15 es una decisión de "no hacer", documentada igual). D-08 es un hallazgo confirmado por simulación, con decisión consciente de no resolverlo en v1 (ver sección 11, Fuera de alcance).*
+*D-04 a D-07, D-09 a D-18 implementadas (D-15 es una decisión de "no hacer", documentada igual). D-08 es un hallazgo confirmado por simulación, con decisión consciente de no resolverlo en v1 (ver sección 11, Fuera de alcance).*
 
 ## 11. Fuera de alcance para v1
 - Retrigger de Free Spins.

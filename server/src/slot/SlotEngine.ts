@@ -3,7 +3,9 @@ import { SymbolId, SYMBOL_DEFINITIONS } from './Symbol.js';
 import { buildReelStrip, spinReel } from './ReelStrip.js';
 import { PAYLINES } from './Paylines.js';
 import { RNG } from './RNG.js';
+import { randomUUID } from 'node:crypto';
 import { createFreeSpinsSession } from './FreeSpinsSession.js';
+import { getOrCreateBalance, adjustBalance } from './PlayerBalance.js';
 
 export interface GridPosition {
   reel: number;
@@ -18,6 +20,7 @@ export interface LineWin {
 }
 
 export interface SpinResult {
+  spinId: string;
   grid: SymbolId[][]; // grid[reel][row]
   corePositions: GridPosition[];
   coreWildPositions: GridPosition[];
@@ -30,7 +33,13 @@ export interface SpinResult {
   freeSpinsAwarded: number;
   /** Presente solo si freeSpinsTriggered es true — usar en POST /free-spin. */
   freeSpinsSessionId: string | null;
+  /** Saldo del jugador después de este giro, calculado por el servidor (Zero Trust). */
+  balance: number;
 }
+
+export type SpinResponse =
+  | { ok: true; result: SpinResult }
+  | { ok: false; error: string };
 
 // Un strip por rodillo. En v1 los 5 usan el mismo conteo de símbolos.
 const REEL_STRIPS: SymbolId[][] = Array.from({ length: GRID_REELS }, () => buildReelStrip(REEL_STRIP_COUNTS));
@@ -147,7 +156,14 @@ export function evaluateScatter(grid: SymbolId[][], totalBet: number): { scatter
   return { scatterCount, scatterWin, freeSpinsTriggered };
 }
 
-export function spin(betPerLine: number): SpinResult {
+export function spin(betPerLine: number, playerId: string): SpinResponse {
+  const totalBet = betPerLine * PAYLINES.length;
+  const currentBalance = getOrCreateBalance(playerId);
+
+  if (currentBalance < totalBet) {
+    return { ok: false, error: 'Saldo insuficiente' };
+  }
+
   const grid = generateGrid();
 
   const corePositions = findCorePositions(grid);
@@ -155,25 +171,33 @@ export function spin(betPerLine: number): SpinResult {
 
   const { lineWins, totalLineWin } = evaluateAllLines(grid, betPerLine);
 
-  const totalBet = betPerLine * PAYLINES.length;
   const { scatterCount, scatterWin, freeSpinsTriggered } = evaluateScatter(grid, totalBet);
 
   const freeSpinsAwarded = freeSpinsTriggered ? FREE_SPINS_AWARDED : 0;
   // El giro que activa Free Spins es base game: sus Cores NO quedan sticky (ver GDD, decisión D-05).
   // La ronda de Free Spins arranca sin ningún Core pegado todavía.
-  const freeSpinsSession = freeSpinsTriggered ? createFreeSpinsSession(betPerLine, freeSpinsAwarded) : null;
+  const freeSpinsSession = freeSpinsTriggered ? createFreeSpinsSession(betPerLine, freeSpinsAwarded, playerId) : null;
+
+  const totalWin = totalLineWin + scatterWin;
+  // Saldo calculado y guardado en el servidor — el cliente solo va a mostrar este número.
+  const balance = adjustBalance(playerId, totalWin - totalBet);
 
   return {
-    grid,
-    corePositions,
-    coreWildPositions,
-    scatterCount,
-    lineWins,
-    totalLineWin,
-    scatterWin,
-    totalWin: totalLineWin + scatterWin,
-    freeSpinsTriggered,
-    freeSpinsAwarded,
-    freeSpinsSessionId: freeSpinsSession?.sessionId ?? null,
+    ok: true,
+    result: {
+      spinId: randomUUID(),
+      grid,
+      corePositions,
+      coreWildPositions,
+      scatterCount,
+      lineWins,
+      totalLineWin,
+      scatterWin,
+      totalWin,
+      freeSpinsTriggered,
+      freeSpinsAwarded,
+      freeSpinsSessionId: freeSpinsSession?.sessionId ?? null,
+      balance,
+    },
   };
 }

@@ -2,6 +2,7 @@ import { GridPosition } from './SlotEngine.js';
 
 export interface FreeSpinsSession {
   sessionId: string;
+  playerId: string;
   betPerLine: number;
   spinsRemaining: number;
   /** Posiciones de Core AI que quedaron fijas (sticky) en rondas anteriores de esta sesión. */
@@ -17,9 +18,10 @@ function generateSessionId(): string {
   return `fs_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
-export function createFreeSpinsSession(betPerLine: number, spinsAwarded: number): FreeSpinsSession {
+export function createFreeSpinsSession(betPerLine: number, spinsAwarded: number, playerId: string): FreeSpinsSession {
   const session: FreeSpinsSession = {
     sessionId: generateSessionId(),
+    playerId,
     betPerLine,
     spinsRemaining: spinsAwarded,
     stickyCorePositions: [], // arranca vacío: el giro que activó el bonus no cuenta (ver GDD, decisión D-05)

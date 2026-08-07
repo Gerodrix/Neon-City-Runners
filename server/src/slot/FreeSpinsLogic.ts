@@ -1,5 +1,6 @@
 import { PAYLINES } from './Paylines.js';
 import { SymbolId } from './Symbol.js';
+import { randomUUID } from 'node:crypto';
 import {
   GridPosition,
   LineWin,
@@ -15,8 +16,10 @@ import {
   saveFreeSpinsSession,
   deleteFreeSpinsSession,
 } from './FreeSpinsSession.js';
+import { adjustBalance } from './PlayerBalance.js';
 
 export interface FreeSpinsSpinResult {
+  spinId: string;
   grid: SymbolId[][];
   corePositions: GridPosition[]; // sticky de rondas anteriores + nuevos, todos los CORE del grid actual
   coreWildPositions: GridPosition[];
@@ -26,6 +29,8 @@ export interface FreeSpinsSpinResult {
   sessionTotalWin: number;
   spinsRemaining: number;
   sessionOver: boolean;
+  /** Saldo del jugador después de este giro, calculado por el servidor (Zero Trust). */
+  balance: number;
 }
 
 export type FreeSpinResponse =
@@ -82,9 +87,14 @@ export function spinFreeSpins(sessionId: string): FreeSpinResponse {
     saveFreeSpinsSession(updatedSession);
   }
 
+  // Los giros de Free Spins no cuestan apuesta nueva (ya se pagaron con el giro que activó el bonus),
+  // así que acá solo se acredita lo ganado, nunca se descuenta nada.
+  const balance = adjustBalance(session.playerId, spinWin);
+
   return {
     ok: true,
     result: {
+      spinId: randomUUID(),
       grid,
       corePositions,
       coreWildPositions,
@@ -94,6 +104,7 @@ export function spinFreeSpins(sessionId: string): FreeSpinResponse {
       sessionTotalWin: updatedSession.totalWin,
       spinsRemaining: updatedSession.spinsRemaining,
       sessionOver,
+      balance,
     },
   };
 }

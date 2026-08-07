@@ -1,4 +1,11 @@
 // Tipos base de símbolos y su definición (nombre, si es wild/scatter/core, tabla de pago).
+// Los pagos viven en paytable.json (config externa) — se pueden ajustar sin
+// tocar este archivo ni recompilar, algo que un motor de slots real necesita
+// (ver comparación con matriz de referencia, GDD decisión D-14).
+
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 
 export type SymbolId =
   | 'RUNNER'
@@ -29,16 +36,41 @@ export interface SymbolDefinition {
   payout?: SymbolPayout;
 }
 
-export const SYMBOL_DEFINITIONS: Record<SymbolId, SymbolDefinition> = {
-  RUNNER: { id: 'RUNNER', name: 'Runner', isWild: false, isScatter: false, isCore: false, payout: { three: 6.5, four: 34, five: 136 } },
-  NETRUNNER: { id: 'NETRUNNER', name: 'Netrunner', isWild: false, isScatter: false, isCore: false, payout: { three: 5.5, four: 27, five: 103 } },
-  CYBERDOG: { id: 'CYBERDOG', name: 'CyberDog', isWild: false, isScatter: false, isCore: false, payout: { three: 4.4, four: 21, five: 69 } },
-  DRONE: { id: 'DRONE', name: 'Drone', isWild: false, isScatter: false, isCore: false, payout: { three: 2.7, four: 13.6, five: 48 } },
-  A: { id: 'A', name: 'A', isWild: false, isScatter: false, isCore: false, payout: { three: 1.3, four: 6.5, five: 27 } },
-  K: { id: 'K', name: 'K', isWild: false, isScatter: false, isCore: false, payout: { three: 1.3, four: 5.5, five: 21 } },
-  Q: { id: 'Q', name: 'Q', isWild: false, isScatter: false, isCore: false, payout: { three: 0.7, four: 4.4, five: 14 } },
-  J: { id: 'J', name: 'J', isWild: false, isScatter: false, isCore: false, payout: { three: 0.7, four: 2.7, five: 11 } },
-  CORE: { id: 'CORE', name: 'Core AI', isWild: false, isScatter: false, isCore: true },
-  SCATTER: { id: 'SCATTER', name: 'Data Vault', isWild: false, isScatter: true, isCore: false },
-  WILD: { id: 'WILD', name: 'Glitch', isWild: true, isScatter: false, isCore: false },
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const paytablePath = path.join(__dirname, '../config/paytable.json');
+const paytable: Record<string, SymbolPayout> = JSON.parse(readFileSync(paytablePath, 'utf-8'));
+
+const SYMBOL_NAMES: Record<SymbolId, string> = {
+  RUNNER: 'Runner',
+  NETRUNNER: 'Netrunner',
+  CYBERDOG: 'CyberDog',
+  DRONE: 'Drone',
+  A: 'A',
+  K: 'K',
+  Q: 'Q',
+  J: 'J',
+  CORE: 'Core AI',
+  SCATTER: 'Data Vault',
+  WILD: 'Glitch',
 };
+
+const PAYING_SYMBOLS: SymbolId[] = ['RUNNER', 'NETRUNNER', 'CYBERDOG', 'DRONE', 'A', 'K', 'Q', 'J'];
+const SPECIAL_SYMBOLS: { id: SymbolId; isWild: boolean; isScatter: boolean; isCore: boolean }[] = [
+  { id: 'CORE', isWild: false, isScatter: false, isCore: true },
+  { id: 'SCATTER', isWild: false, isScatter: true, isCore: false },
+  { id: 'WILD', isWild: true, isScatter: false, isCore: false },
+];
+
+export const SYMBOL_DEFINITIONS: Record<SymbolId, SymbolDefinition> = {} as Record<SymbolId, SymbolDefinition>;
+
+for (const id of PAYING_SYMBOLS) {
+  const payout = paytable[id];
+  if (!payout) {
+    throw new Error(`Falta el símbolo "${id}" en paytable.json`);
+  }
+  SYMBOL_DEFINITIONS[id] = { id, name: SYMBOL_NAMES[id], isWild: false, isScatter: false, isCore: false, payout };
+}
+
+for (const { id, isWild, isScatter, isCore } of SPECIAL_SYMBOLS) {
+  SYMBOL_DEFINITIONS[id] = { id, name: SYMBOL_NAMES[id], isWild, isScatter, isCore };
+}

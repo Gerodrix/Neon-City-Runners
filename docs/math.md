@@ -4,19 +4,19 @@
 
 | Símbolo | Rol | Paga línea (3/4/5) | Sustituye |
 |---|---|---|---|
-| Runner (high) | Alto | 6.5 / 34 / 136 | — |
-| Netrunner (high) | Alto | 5.5 / 27 / 103 | — |
-| CyberDog (high) | Medio-alto | 4.4 / 21 / 69 | — |
-| Drone (high) | Medio | 2.7 / 13.6 / 48 | — |
-| A (low) | Bajo | 1.3 / 6.5 / 27 | — |
-| K (low) | Bajo | 1.3 / 5.5 / 21 | — |
-| Q (low) | Bajo | 0.7 / 4.4 / 14 | — |
-| J (low) | Bajo | 0.7 / 2.7 / 11 | — |
-| Glitch (WILD) | Especial | sin pago propio en v1 | sí, a todo excepto Scatter y Core |
+| Runner (high) | Alto | 6.7 / 35 / 140 | — |
+| Netrunner (high) | Alto | 5.7 / 27.8 / 106 | — |
+| CyberDog (high) | Medio-alto | 4.5 / 21.6 / 71 | — |
+| Drone (high) | Medio | 2.8 / 14 / 49 | — |
+| A (low) | Bajo | 1.3 / 6.7 / 28 | — |
+| K (low) | Bajo | 1.3 / 5.7 / 22 | — |
+| Q (low) | Bajo | 0.7 / 4.5 / 14 | — |
+| J (low) | Bajo | 0.7 / 2.8 / 11 | — |
+| Glitch (WILD) | Especial | 8.2 / 41 / 165 (v2, ver D-19) | sí, a todo excepto Scatter y Core |
 | Core AI | Generador | sin pago directo | no |
 | Data Vault (SCATTER) | Trigger | 2x / 10x / 50x apuesta total (3/4/5 en cualquier posición) | no |
 
-Pagos en "monedas por línea apostada". **Tabla recalibrada por simulación** (ver sección "RTP medido" más abajo) — no son los valores originales de diseño, se ajustaron ~1.36x sobre la v1 inicial para alcanzar el RTP objetivo.
+Pagos en "monedas por línea apostada". **D-19 (corrección post-lanzamiento):** el Wild pasó a tener tabla de pago propia — antes (v1/v2) solo sustituía. Se detectó que en rondas avanzadas de Free Spins, un tablero saturado de Cores+Wilds podía pagar 0 porque nada de lo que lo llenaba tenía valor propio. Ver sección "D-19" más abajo para el detalle completo.
 
 ## Reel strips (v2 calibrada, 40 símbolos por rodillo, misma distribución en los 5 rodillos)
 
@@ -84,19 +84,35 @@ La primera versión de la matemática (Core y Scatter al 5% cada uno, tabla de p
 ### Metodología (para referencia)
 El RTP se compone de: (1) valor esperado de líneas base, (2) contribución del Core AI vía wilds generados, y (3) contribución de Scatter/Free Spins — los tres puntos (2) y (3) no tienen fórmula cerrada simple por la aleatoriedad de posiciones y el estado acumulado entre giros de Free Spins, por eso se miden con simulación en vez de calcularse a mano.
 
-## D-08 — Distribución del premio dentro de una ronda de Free Spins
+## D-19 — Corrección de la saturación de Free Spins (post-lanzamiento)
 
-A diferencia del RTP total, esta distribución resultó estable entre corridas de distinto tamaño (2M, 3M, 10M, 30M) — no depende tanto de eventos raros de pago alto, así que el patrón se puede dar por confirmado con confianza. Valores de la corrida de 30M:
+**Síntoma real observado:** en una ronda de Free Spins, el tablero llegó a estar 100% ocupado por Core AI y Wild — ni un solo símbolo normal en las 20 celdas. Como en ese momento (v1/v2) ni el Core ni el Wild pagaban por sí mismos, ese giro no podía pagar nada por más lleno de símbolos especiales que estuviera el tablero. Esto era el hallazgo D-08 llevado a su caso extremo.
 
-| Giro dentro de la ronda | Premio promedio | % de giros en 0 |
+**Diagnóstico:** dos causas independientes se combinaban:
+1. El Wild no tenía tabla de pago propia (decisión original D-02, para simplificar el balanceo inicial).
+2. Cada Core generaba entre 2 y 4 wilds sin importar cuán lleno ya estuviera el tablero, así que una ronda larga con varios Cores sticky terminaba saturándolo por completo.
+
+**Solución aplicada (reemplaza la decisión original D-02):**
+1. El Wild ahora tiene tabla de pago propia (ver tabla de arriba) — una línea toda-Wild ya paga en vez de dar 0.
+2. La cantidad de wilds que genera cada Core baja a medida que el tablero ya está más ocupado (`occupiedRatio` en `applyCoreWildGeneration`), en vez de un tope duro fijo. Se autorregula giro a giro y también dentro de un mismo giro si caen varios Cores juntos.
+
+**Resultado medido (15M de giros agrupados, misma metodología que el RTP general):**
+
+| Giro dentro de la ronda | Antes (D-08 original) | Después (D-19) |
 |---|---|---|
-| 1 | 9.90 | 42.1% |
-| 2 | 23.71 | 24.2% |
-| 3 | 31.90 | 22.5% |
-| 4 | 32.05 | 32.4% |
-| 5 | 27.08 | 47.2% |
-| 6 | 20.14 | 62.2% |
-| 7 | 13.90 | 74.7% |
-| 8 | 8.96 | 83.8% |
+| 1 | 9.90 | 8.72 |
+| 2 | 23.71 | 20.18 |
+| 3 | 31.90 | 32.65 |
+| 4 | 32.05 | 43.44 |
+| 5 | 27.08 | 50.92 |
+| 6 | 20.14 | 55.65 |
+| 7 | 13.90 | 57.16 |
+| 8 | 8.96 | 56.77 |
+
+Antes, el premio subía hasta el giro 3-4 y después se desplomaba (el pilar de "progresión dentro del bonus" se rompía en la segunda mitad de la ronda). Ahora sube de forma sostenida durante toda la ronda — el diseño finalmente se comporta como se planeó desde el GDD.
+
+**RTP recalibrado tras el cambio:** 95.99%, agrupando 15M de giros (5M + 10M) con la nueva tabla de pagos — dentro del objetivo, sin necesidad de otro ajuste.
+
+**Limitación que sigue existiendo:** un Core en el medio de una línea todavía la "bloquea" (no paga y no es sustituible) — la corrección reduce mucho la saturación pero no la elimina al 100%. Se evaluó también rediseñar el Core como un multiplicador global en vez de un generador físico de wilds (eliminaría el problema de raíz), pero se descartó para esta versión: es un cambio de identidad de la mecánica central, con riesgo matemático más alto (los multiplicadores acumulativos son notoriamente difíciles de calibrar sin que el RTP se dispare), y hubiera invalidado buena parte de las animaciones y la narrativa ya construidas. Queda anotado como posible dirección de v2 si en el futuro se justifica.
 
 **Confirmado, parcialmente mitigado:** con la matemática recalibrada, el premio sube y llega a su pico en el giro 3-4 (el patrón de "progresión" del pilar de diseño se cumple en la primera mitad de la ronda), pero cae fuerte en la segunda mitad — para el giro 8, el 84.6% de los giros no paga nada. La causa sigue siendo la misma: demasiados Cores sticky acumulados saturan el grid de Wilds sin tabla de pago propia (D-02). No se corrige en v1 — queda anotado en el roadmap del GDD como mejora futura (ej. limitar la cantidad máxima de Cores sticky, o darle tabla de pago propia al Wild).

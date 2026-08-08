@@ -66,9 +66,14 @@ export function findCorePositions(grid: SymbolId[][]): GridPosition[] {
 }
 
 /**
- * Por cada Core AI en el grid, convierte entre CORE_MIN_WILDS y CORE_MAX_WILDS
- * posiciones aleatorias del grid en WILD, evitando pisar CORE o SCATTER,
- * y evitando repetir una posición ya convertida.
+ * Por cada Core AI en el grid, convierte una cantidad de posiciones aleatorias en WILD,
+ * evitando pisar CORE o SCATTER existentes.
+ *
+ * D-19: en vez de un tope duro, la cantidad de wilds por Core baja a medida que el
+ * tablero ya está más ocupado (occupiedRatio) — así nunca se llega al 100% de saturación
+ * que se vio en la ronda de Free Spins que motivó esta corrección, sin que se sienta
+ * una regla artificial (se autorregula giro a giro y dentro del mismo giro si caen
+ * varios Cores juntos).
  */
 export function applyCoreWildGeneration(grid: SymbolId[][], corePositions: GridPosition[]): GridPosition[] {
   const totalPositions = GRID_REELS * GRID_ROWS;
@@ -87,7 +92,14 @@ export function applyCoreWildGeneration(grid: SymbolId[][], corePositions: GridP
   const generatedWilds: GridPosition[] = [];
 
   for (const _core of corePositions) {
-    const wildsToGenerate = RNG.randomIntInRange(CORE_MIN_WILDS, CORE_MAX_WILDS);
+    const availablePositions = totalPositions - excluded.size;
+    if (availablePositions <= 0) break; // tablero ya lleno, este Core no genera nada más
+
+    const occupiedRatio = excluded.size / totalPositions;
+    const scaledMax = Math.max(1, Math.round(CORE_MAX_WILDS * (1 - occupiedRatio)));
+    const scaledMin = Math.min(CORE_MIN_WILDS, scaledMax);
+
+    const wildsToGenerate = Math.min(RNG.randomIntInRange(scaledMin, scaledMax), availablePositions);
     const chosenIndices = RNG.uniqueRandomPositions(wildsToGenerate, totalPositions, excluded);
 
     for (const index of chosenIndices) {

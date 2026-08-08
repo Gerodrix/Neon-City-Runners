@@ -32,7 +32,7 @@ Formato: cada Epic agrupa historias de usuario con criterios de aceptación. Los
 - **NCR-S2.4** — Como jugador, quiero ver cuántos Free Spins me quedan y el total acumulado ganado en la ronda.
   *Criterios de aceptación:* la respuesta de cada giro en FS incluye `spinsRemaining` y `sessionTotalWin`. ✅
 
-**Hallazgo de QA (D-08, ver GDD sección 10):** en rondas avanzadas, un grid saturado de Cores sticky + Wilds puede pagar 0 en ese giro porque el Wild no tiene tabla propia (D-02). Pendiente de validar impacto real en NCR-E6 antes de decidir si se ajusta.
+**Hallazgo de QA (D-08, ver GDD sección 10):** en rondas avanzadas, un grid saturado de Cores sticky + Wilds podía pagar 0 en ese giro porque el Wild no tenía tabla propia (D-02). **Corregido por D-19** — ver NCR-E9.
 
 ---
 
@@ -81,7 +81,7 @@ Formato: cada Epic agrupa historias de usuario con criterios de aceptación. Los
 - **NCR-S6.1** — Como desarrollador, quiero un script que reutilice `SlotEngine.ts` y corra 1M+ giros simulados.
   *Criterios de aceptación:* el script imprime RTP real (ganado/apostado), hit frequency, y frecuencia de activación de Free Spins. ✅ `server/src/scripts/simulate.ts`, `npm run simulate`.
 - **NCR-S6.4 (QA)** — Como desarrollador, quiero medir si los giros tardíos de una ronda de Free Spins (muchos Cores sticky) pagan significativamente menos que los tempranos.
-  *Criterios de aceptación:* la simulación reporta spinWin promedio por número de orden dentro de la ronda de FS (giro 1, 2, ... 8); con ese dato se decide si D-08 amerita ajustar D-02. ✅ Confirmado: cae de 31.67 (giro 3) a 8.48 (giro 8), 84.6% de giros en 0 al final. Se decide no corregir en v1 (ver GDD, D-08).
+  *Criterios de aceptación:* la simulación reporta spinWin promedio por número de orden dentro de la ronda de FS (giro 1, 2, ... 8); con ese dato se decide si D-08 amerita ajustar D-02. ✅ Confirmado: caía de 31.90 (giro 3) a 8.96 (giro 8), 83.8% de giros en 0 al final. Corregido en NCR-E9 (D-19).
 - **NCR-S6.2** — Como desarrollador, quiero poder ajustar `REEL_STRIP_COUNTS` y volver a correr la simulación para calibrar el RTP hacia ~96%.
   *Criterios de aceptación:* RTP medido dentro de un rango razonable del objetivo. ✅ RTP inicial ~140% → recalibrado, validado en 96.77% agrupando 46M de giros (corridas individuales de 1-30M variaron entre 90% y 105%, por eso se agrupó en vez de confiar en una sola corrida). Ver GDD, D-09/D-10.
 - **NCR-S6.3** — Como desarrollador, quiero documentar el RTP final validado en `docs/math.md`, reemplazando el estimado inicial.
@@ -114,3 +114,27 @@ Formato: cada Epic agrupa historias de usuario con criterios de aceptación. Los
   *Criterios de aceptación:* pagos leídos desde `paytable.json`, no hardcodeados en TS. ✅ (D-14)
 - **NCR-S8.4 (decisión de no hacer)** — Evaluar si sumar cascadas/tumbling, Scatter Pays con conteo global, o multiplicadores globales acumulativos.
   *Criterios de aceptación:* decisión documentada con motivo — son mecánicas de un género de slot distinto (ways/cluster), incompatibles con el diseño actual de 12 líneas + Core AI. No se adoptan. ✅ (D-15)
+
+---
+
+## NCR-E9 — Corrección de saturación en Free Spins (D-19)
+**Estado:** ✅ Done
+**Objetivo:** corregir D-08 tras un caso real observado (tablero 100% Core+Wild, 0 símbolos normales, ronda sin poder pagar nada).
+
+- **NCR-S9.1** — Evaluar opciones de corrección (tope duro, generación decreciente, multiplicador global, sticky con expiración, combinada) con pros/contras de cada una.
+  *Criterios de aceptación:* comparación documentada, decisión justificada. ✅ Elegida: Wild con pago propio + generación decreciente de wilds según saturación del tablero.
+- **NCR-S9.2** — Como jugador, quiero que el Wild pague por sí mismo cuando forma una línea completa.
+  *Criterios de aceptación:* `paytable.json` incluye entrada para WILD; `Symbol.ts` lo trata como símbolo pagador. ✅
+- **NCR-S9.3** — Como jugador, quiero que el tablero nunca llegue a saturarse al 100% de símbolos especiales.
+  *Criterios de aceptación:* `applyCoreWildGeneration` reduce la cantidad de wilds por Core según cuán ocupado está el tablero, sin tope duro fijo. ✅
+- **NCR-S9.4** — Como desarrollador, quiero confirmar que la corrección realmente mejora la curva de premios dentro de la ronda, no solo en teoría.
+  *Criterios de aceptación:* comparación medida antes/después con la misma metodología de simulación. ✅ El promedio pasó de desplomarse (32→9 entre giro 4 y 8) a sostenerse (43→57 entre giro 4 y 8).
+- **NCR-S9.5** — Recalibrar el RTP general tras el cambio de tabla de pagos.
+  *Criterios de aceptación:* RTP medido dentro del objetivo, agrupando múltiples corridas grandes. ✅ 95.99% (15M de giros agrupados).
+
+---
+
+## NCR-E10 a NCR-E13 — Ver `pending-features-plan.md`
+**Estado:** 🔲 To Do (diseño ya pensado, sin implementar)
+
+Cuatro épicas nuevas con el diseño y los casos borde ya resueltos en [`pending-features-plan.md`](./pending-features-plan.md): VFX de líneas glitcheadas conectando nodos, Buy Bonus, Core Boost, y selector de apuesta con mínimo/máximo. Buy Bonus y Core Boost necesitan su propia sesión de simulación antes de darse por terminadas — no se calibran a ojo, mismo criterio que D-19.

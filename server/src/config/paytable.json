@@ -1,10 +1,11 @@
 {
-  "RUNNER": { "three": 6.5, "four": 34, "five": 136 },
-  "NETRUNNER": { "three": 5.5, "four": 27, "five": 103 },
-  "CYBERDOG": { "three": 4.4, "four": 21, "five": 69 },
-  "DRONE": { "three": 2.7, "four": 13.6, "five": 48 },
-  "A": { "three": 1.3, "four": 6.5, "five": 27 },
-  "K": { "three": 1.3, "four": 5.5, "five": 21 },
-  "Q": { "three": 0.7, "four": 4.4, "five": 14 },
-  "J": { "three": 0.7, "four": 2.7, "five": 11 }
+  "RUNNER": { "three": 6.7, "four": 35, "five": 140 },
+  "NETRUNNER": { "three": 5.7, "four": 27.8, "five": 106 },
+  "CYBERDOG": { "three": 4.5, "four": 21.6, "five": 71 },
+  "DRONE": { "three": 2.8, "four": 14, "five": 49 },
+  "A": { "three": 1.3, "four": 6.7, "five": 28 },
+  "K": { "three": 1.3, "four": 5.7, "five": 22 },
+  "Q": { "three": 0.7, "four": 4.5, "five": 14 },
+  "J": { "three": 0.7, "four": 2.8, "five": 11 },
+  "WILD": { "three": 8.2, "four": 41, "five": 165 }
 }

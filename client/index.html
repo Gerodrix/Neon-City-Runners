@@ -14,6 +14,10 @@
       #bet-control button { background: #333; color: #33f2c7; border: 1px solid #33f2c7; width: 26px; height: 26px; border-radius: 4px; cursor: pointer; font-weight: bold; }
       #bet-control button:disabled { opacity: 0.4; cursor: not-allowed; }
       #bet-value { min-width: 40px; text-align: center; font-weight: bold; }
+      #topup-control { display: flex; align-items: center; gap: 6px; }
+      #topup-amount { width: 70px; background: #1a1a2a; color: #e0e0ff; border: 1px solid #33f2c7; border-radius: 4px; padding: 4px 6px; }
+      #topup-btn { background: #333; color: #33f2c7; border: 1px solid #33f2c7; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
+      #topup-btn:disabled { opacity: 0.4; cursor: not-allowed; }
     </style>
   </head>
   <body>
@@ -27,7 +31,10 @@
       </div>
       <span id="win">Último premio: 0</span>
       <button id="spin-btn">SPIN</button>
-      <button id="topup-btn" style="background:#333; color:#33f2c7; border:1px solid #33f2c7; padding:6px 12px; border-radius:4px; cursor:pointer;">+1000 (demo)</button>
+      <div id="topup-control">
+        <input id="topup-amount" type="number" value="1000" min="1" step="1" title="Monto a recargar (demo)" />
+        <button id="topup-btn" type="button">Cargar (demo)</button>
+      </div>
       <span id="fs-status"></span>
     </div>
     <div id="pixi-container"></div>

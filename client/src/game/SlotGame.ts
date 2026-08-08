@@ -76,9 +76,12 @@ export class SlotGame {
   // (ver server/src/slot/PlayerBalance.ts) — el cliente nunca lo calcula.
   private balance = 0;
   private playerId: string;
-  // Valores por defecto hasta que /bet-config responda — el servidor es la fuente de verdad real.
+  // Valores por defecto hasta que /bet-config y /topup-config respondan —
+  // el servidor es la fuente de verdad real (D-20).
   private betSteps: number[] = [0.1, 0.2, 0.5, 1, 2, 5, 10];
   private betIndex = 3; // arranca en 1 (índice del array por defecto)
+  private minTopupAmount = 1;
+  private maxTopupAmount = 100000;
   private isSpinning = false;
   private wasInsufficientFunds = false;
 
@@ -98,9 +101,10 @@ export class SlotGame {
 
     this.buildGridCells();
     this.bindSpinButton();
-    this.bindTopupButton();
+    this.bindTopupControl();
     this.bindBetControls();
     this.loadBetConfig();
+    this.loadTopupConfig();
     this.loadInitialBalance();
   }
 
@@ -117,6 +121,90 @@ export class SlotGame {
       console.error('Error al obtener la configuración de apuesta:', error);
     }
   }
+
+  private async loadTopupConfig(): Promise<void> {
+    try {
+      const response = await fetch(`${SERVER_URL}/topup-config`);
+      if (!response.ok) throw new Error(`Error del servidor: ${response.status}`);
+      const data: { minTopupAmount: number; maxTopupAmount: number } = await response.json();
+      this.minTopupAmount = data.minTopupAmount;
+      this.maxTopupAmount = data.maxTopupAmount;
+      const input = document.getElementById('topup-amount') as HTMLInputElement;
+      input.min = String(this.minTopupAmount);
+      input.max = String(this.maxTopupAmount);
+    } catch (error) {
+      console.error('Error al obtener la configuración de recarga:', error);
+    }
+  }
+
+  private async loadInitialBalance(): Promise<void> {
+    try {
+      const response = await fetch(`${SERVER_URL}/balance?playerId=${this.playerId}`);
+      if (!response.ok) throw new Error(`Error del servidor: ${response.status}`);
+      const data: { balance: number } = await response.json();
+      this.balance = data.balance;
+      this.updateUI(0);
+      this.refreshSpinAvailability();
+    } catch (error) {
+      console.error('Error al obtener el saldo inicial:', error);
+    }
+  }
+
+  private bindTopupControl(): void {
+    const button = document.getElementById('topup-btn') as HTMLButtonElement;
+    const input = document.getElementById('topup-amount') as HTMLInputElement;
+
+    button.addEventListener('click', async () => {
+      const amount = Number(input.value);
+
+      if (!Number.isFinite(amount) || amount < this.minTopupAmount || amount > this.maxTopupAmount) {
+        this.setFreeSpinsStatus(`⚠️ El monto tiene que estar entre ${this.minTopupAmount} y ${this.maxTopupAmount}`);
+        this.delay2500ThenHideIfNotInsufficient();
+        return;
+      }
+
+      button.disabled = true;
+      try {
+        const response = await fetch(`${SERVER_URL}/balance/topup`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ playerId: this.playerId, amount }),
+        });
+        if (!response.ok) {
+          const errorBody = await response.json().catch(() => ({ error: 'Error desconocido' }));
+          throw new Error(errorBody.error ?? `Error del servidor: ${response.status}`);
+        }
+        const data: { balance: number } = await response.json();
+        this.balance = data.balance;
+        this.updateUI(0);
+        this.refreshSpinAvailability();
+      } catch (error) {
+        console.error('Error al recargar saldo:', error);
+        this.setFreeSpinsStatus(`⚠️ ${error instanceof Error ? error.message : 'Error al recargar'}`);
+        this.delay2500ThenHideIfNotInsufficient();
+      } finally {
+        button.disabled = false;
+      }
+    });
+  }
+
+  private refreshSpinAvailability(): void {
+    const button = document.getElementById('spin-btn') as HTMLButtonElement;
+    const totalBet = this.betPerLine * 12;
+    const insufficientNow = this.balance < totalBet;
+
+    if (insufficientNow) {
+      button.disabled = true;
+      this.setFreeSpinsStatus(`💸 Saldo insuficiente para apostar ${this.betPerLine} por línea — recargá saldo`);
+    } else {
+      if (!this.isSpinning) button.disabled = false;
+      if (this.wasInsufficientFunds) this.hideFreeSpinsStatus();
+    }
+
+    this.wasInsufficientFunds = insufficientNow;
+  }
+
+  // ---------- Selector de apuesta ----------
 
   private bindBetControls(): void {
     const decreaseButton = document.getElementById('bet-decrease') as HTMLButtonElement;
@@ -144,55 +232,6 @@ export class SlotGame {
     (document.getElementById('bet-decrease') as HTMLButtonElement).disabled = this.isSpinning || this.betIndex <= 0;
     (document.getElementById('bet-increase') as HTMLButtonElement).disabled =
       this.isSpinning || this.betIndex >= this.betSteps.length - 1;
-  }
-
-  private async loadInitialBalance(): Promise<void> {
-    try {
-      const response = await fetch(`${SERVER_URL}/balance?playerId=${this.playerId}`);
-      if (!response.ok) throw new Error(`Error del servidor: ${response.status}`);
-      const data: { balance: number } = await response.json();
-      this.balance = data.balance;
-      this.updateUI(0);
-      this.refreshSpinAvailability();
-    } catch (error) {
-      console.error('Error al obtener el saldo inicial:', error);
-    }
-  }
-
-  private bindTopupButton(): void {
-    const button = document.getElementById('topup-btn') as HTMLButtonElement;
-    button.addEventListener('click', async () => {
-      try {
-        const response = await fetch(`${SERVER_URL}/balance/topup`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ playerId: this.playerId }),
-        });
-        if (!response.ok) throw new Error(`Error del servidor: ${response.status}`);
-        const data: { balance: number } = await response.json();
-        this.balance = data.balance;
-        this.updateUI(0);
-        this.refreshSpinAvailability();
-      } catch (error) {
-        console.error('Error al recargar saldo:', error);
-      }
-    });
-  }
-
-  private refreshSpinAvailability(): void {
-    const button = document.getElementById('spin-btn') as HTMLButtonElement;
-    const totalBet = this.betPerLine * 12;
-    const insufficientNow = this.balance < totalBet;
-
-    if (insufficientNow) {
-      button.disabled = true;
-      this.setFreeSpinsStatus('💸 Saldo insuficiente para girar — usá "+1000 (demo)" para recargar');
-    } else {
-      if (!this.isSpinning) button.disabled = false;
-      if (this.wasInsufficientFunds) this.hideFreeSpinsStatus();
-    }
-
-    this.wasInsufficientFunds = insufficientNow;
   }
 
   // ---------- Grid: construcción y dibujo de celdas ----------

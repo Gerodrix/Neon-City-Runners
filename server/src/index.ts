@@ -3,7 +3,7 @@ import cors from 'cors';
 import { spin } from './slot/SlotEngine.js';
 import { spinFreeSpins } from './slot/FreeSpinsLogic.js';
 import { getOrCreateBalance, adjustBalance } from './slot/PlayerBalance.js';
-import { MIN_BET_PER_LINE, MAX_BET_PER_LINE, BET_STEPS } from './config/SlotConfig.js';
+import { MIN_BET_PER_LINE, MAX_BET_PER_LINE, BET_STEPS, MIN_TOPUP_AMOUNT, MAX_TOPUP_AMOUNT } from './config/SlotConfig.js';
 
 const app = express();
 const PORT = 4000;
@@ -15,6 +15,10 @@ app.use(express.json());
 // cambia BET_STEPS/MIN/MAX, la UI se actualiza sola sin tocar el cliente.
 app.get('/bet-config', (_req, res) => {
   res.json({ minBetPerLine: MIN_BET_PER_LINE, maxBetPerLine: MAX_BET_PER_LINE, betSteps: BET_STEPS });
+});
+
+app.get('/topup-config', (_req, res) => {
+  res.json({ minTopupAmount: MIN_TOPUP_AMOUNT, maxTopupAmount: MAX_TOPUP_AMOUNT });
 });
 
 app.get('/balance', (req, res) => {
@@ -29,14 +33,21 @@ app.get('/balance', (req, res) => {
 });
 
 // Recarga de saldo para pruebas — no existiría en un sistema real con dinero (D-16).
+// El monto lo elige el jugador (antes era fijo en 1000).
 app.post('/balance/topup', (req, res) => {
   const playerId = String(req.body?.playerId ?? '');
+  const amount = Number(req.body?.amount);
 
   if (!playerId) {
     return res.status(400).json({ error: 'playerId es requerido' });
   }
+  if (!Number.isFinite(amount) || amount < MIN_TOPUP_AMOUNT || amount > MAX_TOPUP_AMOUNT) {
+    return res
+      .status(400)
+      .json({ error: `amount debe estar entre ${MIN_TOPUP_AMOUNT} y ${MAX_TOPUP_AMOUNT}` });
+  }
 
-  const balance = adjustBalance(playerId, 1000);
+  const balance = adjustBalance(playerId, amount);
   res.json({ balance });
 });
 

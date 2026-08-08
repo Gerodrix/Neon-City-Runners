@@ -38,3 +38,9 @@ export const MAX_BET_PER_LINE = 10;
 
 /** Valores discretos que ofrece el selector del frontend — igual criterio que un slot real. */
 export const BET_STEPS = [0.1, 0.2, 0.5, 1, 2, 5, 10];
+
+// Límites de recarga de saldo (herramienta de demo/testing, D-16). El monto lo elige
+// el jugador — esto solo evita valores absurdos (negativos, cero, o excesivos).
+// Multi-moneda queda fuera de esta iteración — ver pending-features-plan.md.
+export const MIN_TOPUP_AMOUNT = 1;
+export const MAX_TOPUP_AMOUNT = 100000;

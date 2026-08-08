@@ -114,6 +114,8 @@ Formato: cada Epic agrupa historias de usuario con criterios de aceptación. Los
   *Criterios de aceptación:* pagos leídos desde `paytable.json`, no hardcodeados en TS. ✅ (D-14)
 - **NCR-S8.4 (decisión de no hacer)** — Evaluar si sumar cascadas/tumbling, Scatter Pays con conteo global, o multiplicadores globales acumulativos.
   *Criterios de aceptación:* decisión documentada con motivo — son mecánicas de un género de slot distinto (ways/cluster), incompatibles con el diseño actual de 12 líneas + Core AI. No se adoptan. ✅ (D-15)
+- **NCR-S8.5** — Como jugador (en modo demo), quiero elegir cuánto saldo cargar en vez de un monto fijo.
+  *Criterios de aceptación:* `POST /balance/topup` recibe `amount`, validado contra `MIN_TOPUP_AMOUNT`/`MAX_TOPUP_AMOUNT`; UI con input numérico. Multi-moneda queda fuera de esta iteración (ver `pending-features-plan.md`). ✅
 
 ---
 

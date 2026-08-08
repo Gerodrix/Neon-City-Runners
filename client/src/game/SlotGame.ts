@@ -76,9 +76,15 @@ export class SlotGame {
   // (ver server/src/slot/PlayerBalance.ts) — el cliente nunca lo calcula.
   private balance = 0;
   private playerId: string;
-  private betPerLine = 1;
+  // Valores por defecto hasta que /bet-config responda — el servidor es la fuente de verdad real.
+  private betSteps: number[] = [0.1, 0.2, 0.5, 1, 2, 5, 10];
+  private betIndex = 3; // arranca en 1 (índice del array por defecto)
   private isSpinning = false;
   private wasInsufficientFunds = false;
+
+  private get betPerLine(): number {
+    return this.betSteps[this.betIndex];
+  }
 
   constructor(private app: Application) {
     this.playerId = getPlayerId();
@@ -93,7 +99,51 @@ export class SlotGame {
     this.buildGridCells();
     this.bindSpinButton();
     this.bindTopupButton();
+    this.bindBetControls();
+    this.loadBetConfig();
     this.loadInitialBalance();
+  }
+
+  private async loadBetConfig(): Promise<void> {
+    try {
+      const response = await fetch(`${SERVER_URL}/bet-config`);
+      if (!response.ok) throw new Error(`Error del servidor: ${response.status}`);
+      const data: { minBetPerLine: number; maxBetPerLine: number; betSteps: number[] } = await response.json();
+      this.betSteps = data.betSteps;
+      this.betIndex = Math.min(this.betIndex, this.betSteps.length - 1);
+      this.updateBetDisplay();
+      this.refreshSpinAvailability();
+    } catch (error) {
+      console.error('Error al obtener la configuración de apuesta:', error);
+    }
+  }
+
+  private bindBetControls(): void {
+    const decreaseButton = document.getElementById('bet-decrease') as HTMLButtonElement;
+    const increaseButton = document.getElementById('bet-increase') as HTMLButtonElement;
+
+    decreaseButton.addEventListener('click', () => {
+      if (this.isSpinning || this.betIndex <= 0) return;
+      this.betIndex--;
+      this.updateBetDisplay();
+      this.refreshSpinAvailability();
+    });
+
+    increaseButton.addEventListener('click', () => {
+      if (this.isSpinning || this.betIndex >= this.betSteps.length - 1) return;
+      this.betIndex++;
+      this.updateBetDisplay();
+      this.refreshSpinAvailability();
+    });
+
+    this.updateBetDisplay();
+  }
+
+  private updateBetDisplay(): void {
+    document.getElementById('bet-value')!.textContent = this.betPerLine.toString();
+    (document.getElementById('bet-decrease') as HTMLButtonElement).disabled = this.isSpinning || this.betIndex <= 0;
+    (document.getElementById('bet-increase') as HTMLButtonElement).disabled =
+      this.isSpinning || this.betIndex >= this.betSteps.length - 1;
   }
 
   private async loadInitialBalance(): Promise<void> {
@@ -327,6 +377,7 @@ export class SlotGame {
     if (this.isSpinning) return;
     this.isSpinning = true;
     button.disabled = true;
+    this.updateBetDisplay(); // bloquea también los botones de apuesta mientras gira
 
     try {
       const response = await fetch(`${SERVER_URL}/spin`, {
@@ -367,6 +418,7 @@ export class SlotGame {
     } finally {
       this.isSpinning = false;
       this.refreshSpinAvailability();
+      this.updateBetDisplay();
     }
   }
 

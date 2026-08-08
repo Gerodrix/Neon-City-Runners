@@ -134,7 +134,21 @@ Formato: cada Epic agrupa historias de usuario con criterios de aceptación. Los
 
 ---
 
-## NCR-E10 a NCR-E13 — Ver `pending-features-plan.md`
+## NCR-E13 — Selector de apuesta con mínimo y máximo
+**Estado:** ✅ Done
+**Objetivo:** poder cambiar `betPerLine` desde la UI, dentro de límites validados por el servidor.
+
+- **NCR-S13.1** — Como jugador, quiero subir/bajar mi apuesta con botones, entre valores discretos razonables (0.1 a 10).
+  *Criterios de aceptación:* selector -/+ en la UI, recorre `BET_STEPS`; se bloquea mientras hay un giro en curso. ✅
+- **NCR-S13.2** — Como desarrollador, quiero que el servidor rechace cualquier apuesta fuera de rango, sin confiar en lo que mande el cliente.
+  *Criterios de aceptación:* `POST /spin` valida `betPerLine` contra `MIN_BET_PER_LINE`/`MAX_BET_PER_LINE`. ✅ Probado con 100 (rechaza) y 0.01 (rechaza).
+- **NCR-S13.3** — Como desarrollador, quiero que el frontend no hardcodee los límites por separado del servidor.
+  *Criterios de aceptación:* `GET /bet-config` expone los límites; el cliente los pide al iniciar. ✅ (D-20)
+- **NCR-S13.4 (fuera de esta iteración)** — Soporte multi-moneda con límites que cambien según la moneda usada. Documentado en `pending-features-plan.md`, no implementado.
+
+---
+
+## NCR-E10 a NCR-E12 — Ver `pending-features-plan.md`
 **Estado:** 🔲 To Do (diseño ya pensado, sin implementar)
 
-Cuatro épicas nuevas con el diseño y los casos borde ya resueltos en [`pending-features-plan.md`](./pending-features-plan.md): VFX de líneas glitcheadas conectando nodos, Buy Bonus, Core Boost, y selector de apuesta con mínimo/máximo. Buy Bonus y Core Boost necesitan su propia sesión de simulación antes de darse por terminadas — no se calibran a ojo, mismo criterio que D-19.
+Tres épicas con el diseño y los casos borde ya resueltos en [`pending-features-plan.md`](./pending-features-plan.md): VFX de líneas glitcheadas conectando nodos, Buy Bonus, y Core Boost. Buy Bonus y Core Boost necesitan su propia sesión de simulación antes de darse por terminadas — no se calibran a ojo, mismo criterio que D-19.

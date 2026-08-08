@@ -10,14 +10,24 @@
       #spin-btn { background: #ff2e88; color: white; border: none; padding: 10px 24px; font-weight: bold; cursor: pointer; border-radius: 4px; }
       #spin-btn:disabled { opacity: 0.5; cursor: not-allowed; }
       #fs-status { display: none; color: #33f2c7; font-weight: bold; font-size: 13px; }
+      #bet-control { display: flex; align-items: center; gap: 6px; }
+      #bet-control button { background: #333; color: #33f2c7; border: 1px solid #33f2c7; width: 26px; height: 26px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+      #bet-control button:disabled { opacity: 0.4; cursor: not-allowed; }
+      #bet-value { min-width: 40px; text-align: center; font-weight: bold; }
     </style>
   </head>
   <body>
     <div id="ui">
       <span id="balance">Saldo: 1000</span>
-      <span id="bet">Apuesta por línea: 1</span>
+      <div id="bet-control">
+        <span>Apuesta:</span>
+        <button id="bet-decrease" type="button">-</button>
+        <span id="bet-value">1</span>
+        <button id="bet-increase" type="button">+</button>
+      </div>
       <span id="win">Último premio: 0</span>
       <button id="spin-btn">SPIN</button>
+      <button id="topup-btn" style="background:#333; color:#33f2c7; border:1px solid #33f2c7; padding:6px 12px; border-radius:4px; cursor:pointer;">+1000 (demo)</button>
       <span id="fs-status"></span>
     </div>
     <div id="pixi-container"></div>

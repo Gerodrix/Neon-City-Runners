@@ -30,3 +30,11 @@ export const SCATTER_PAYOUT_MULTIPLIER: Record<number, number> = {
   4: 10,
   5: 50,
 };
+
+// Límites de apuesta por línea (NCR-E13). Multi-moneda queda fuera de esta iteración —
+// ver docs/project-management/pending-features-plan.md.
+export const MIN_BET_PER_LINE = 0.1;
+export const MAX_BET_PER_LINE = 10;
+
+/** Valores discretos que ofrece el selector del frontend — igual criterio que un slot real. */
+export const BET_STEPS = [0.1, 0.2, 0.5, 1, 2, 5, 10];

@@ -48,16 +48,9 @@ Documento de trabajo, no implementado todavía. Cada sección tiene el diseño p
 
 ---
 
-## 4. Selector de apuesta (bet por línea, con mínimo y máximo)
-
-**Frontend:** UI con stepper o dropdown para `betPerLine`, dentro de `MIN_BET` y `MAX_BET` (a definir — valores placeholder razonables: 0.10 a 10). Al cambiar la apuesta, recalcular `refreshSpinAvailability()` (ya existe, solo hay que llamarlo también en el handler de cambio de apuesta, no solo después de girar).
-
-**Backend:** `/spin` ya valida `betPerLine > 0` — hay que sumar el chequeo de `betPerLine <= MAX_BET` (y algún mínimo razonable), coherente con el resto del sistema donde el servidor nunca confía en lo que mande el cliente.
-
-**Explícitamente fuera de esta iteración (lo dijiste vos mismo):** soporte multi-moneda con min/max que cambien según la moneda usada. Cuando se encare, probablemente signifique guardar los límites en la unidad base (ej. centavos) y aplicar una tasa de conversión por moneda, no hardcodear límites por moneda en el frontend.
-
----
-
 ## Cómo se prioriza esto
 
-Ninguna de las 4 depende de las otras para arrancar, salvo que **Buy Bonus y Core Boost necesitan su propia sesión de simulación** (como la que ya hicimos para D-19) antes de poder darlos por terminados — no se calibran a ojo. El selector de apuesta y el VFX de líneas son más rápidos de implementar y no requieren simulación nueva.
+Ninguna de las 3 depende de las otras para arrancar, salvo que **Buy Bonus y Core Boost necesitan su propia sesión de simulación** (como la que ya hicimos para D-19) antes de poder darlos por terminados — no se calibran a ojo. El VFX de líneas no requiere simulación nueva, pero probablemente convenga esperarlo hasta tener arte real de Figma.
+
+*(El selector de apuesta que estaba acá se implementó — ver NCR-E13 en `epics.md`.)*
+

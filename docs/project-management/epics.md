@@ -150,7 +150,23 @@ Formato: cada Epic agrupa historias de usuario con criterios de aceptación. Los
 
 ---
 
-## NCR-E10 a NCR-E12 — Ver `pending-features-plan.md`
+## NCR-E11 — Buy Bonus
+**Estado:** ✅ Done
+**Objetivo:** activar Free Spins directamente a cambio de un costo calibrado por simulación.
+
+- **NCR-S11.1** — Como desarrollador, quiero medir cuánto gana en promedio una ronda de Free Spins, para calcular un precio de compra justo.
+  *Criterios de aceptación:* `simulate.ts` reporta la ganancia promedio de una ronda en unidades de apuesta total. ✅ 3 corridas grandes (10M-15M giros): 27.00x, 28.27x, 28.42x.
+- **NCR-S11.2** — Como desarrollador, quiero que el precio de compra tenga el mismo RTP que el juego general, no un número arbitrario.
+  *Criterios de aceptación:* precio = ganancia promedio / RTP objetivo (95.99%, ya validado). ✅ `BUY_BONUS_MULTIPLIER = 29.5`.
+- **NCR-S11.3** — Como jugador, quiero comprar la ronda de bonus directo, sin depender de que caigan 3+ Scatter.
+  *Criterios de aceptación:* `POST /buy-bonus` cobra el costo, rechaza si no alcanza el saldo, crea la sesión de Free Spins igual que un trigger orgánico. ✅
+- **NCR-S11.4** — Como jugador, quiero ver el costo actualizado en el botón según mi apuesta actual.
+  *Criterios de aceptación:* el botón muestra `apuesta total × 29.5`, se recalcula al cambiar la apuesta. ✅
+- **NCR-S11.5 (nota, no implementado)** — Restricción geográfica de la feature (prohibida/restringida en UK, Países Bajos, Suecia, España, entre otras). Documentado en el GDD como nota de compliance, no como pendiente técnico de esta versión.
+
+---
+
+## NCR-E10, NCR-E12 — Ver `pending-features-plan.md`
 **Estado:** 🔲 To Do (diseño ya pensado, sin implementar)
 
-Tres épicas con el diseño y los casos borde ya resueltos en [`pending-features-plan.md`](./pending-features-plan.md): VFX de líneas glitcheadas conectando nodos, Buy Bonus, y Core Boost. Buy Bonus y Core Boost necesitan su propia sesión de simulación antes de darse por terminadas — no se calibran a ojo, mismo criterio que D-19.
+Dos épicas con el diseño y los casos borde ya resueltos en [`pending-features-plan.md`](./pending-features-plan.md): VFX de líneas glitcheadas conectando nodos, y Core Boost. Core Boost necesita su propia sesión de simulación antes de darse por terminada — no se calibra a ojo, mismo criterio que D-19/D-21.

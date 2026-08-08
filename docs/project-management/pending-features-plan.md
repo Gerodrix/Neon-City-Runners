@@ -19,23 +19,7 @@ Documento de trabajo, no implementado todavía. Cada sección tiene el diseño p
 
 ---
 
-## 2. Buy Bonus (comprar Free Spins directo)
-
-**Qué es:** pagar un múltiplo fijo de la apuesta para activar la ronda de Free Spins sin necesidad de 3+ Scatter.
-
-**Backend:**
-- Nuevo endpoint `POST /buy-bonus` — recibe `{ playerId, betPerLine }`, cobra `buyCost = betPerLine * BUY_BONUS_MULTIPLIER`, crea una `FreeSpinsSession` directamente (mismo flujo que cuando el trigger es orgánico).
-- Mismas reglas de saldo que ya existen: rechazar si `balance < buyCost`, nunca dejar el saldo en negativo (ya es una invariante estructural del sistema — `PlayerBalance.adjustBalance` solo se llama después de confirmar fondos suficientes, ver D-12).
-
-**El número que falta (no se inventa, se mide):** `BUY_BONUS_MULTIPLIER` tiene que salir de la simulación, no de una corazonada. Fórmula: `gananciaPromedioDeUnaRondaDeFS / apuestaBase` — ya tenemos ese dato parcial en `simulate.ts` (`freeSpinsWinTotal / freeSpinsTriggeredCount`), hay que exponerlo como métrica del script y correr una simulación dedicada para el número final.
-
-**Casos borde:**
-- Jurisdicciones reales (UK, Países Bajos, Suecia, España, entre otras) prohíben o restringen "bonus buy" — no se implementa ninguna lógica de geo-restricción ahora, pero queda anotado como nota de compliance en el GDD para cuando se documente como si fuera un producto real.
-- El buy tiene que devolver la misma forma de respuesta que un trigger orgánico (`freeSpinsSessionId`, etc.) para que el frontend reuse el mismo `playFreeSpinsRound` sin lógica duplicada.
-
----
-
-## 3. "Core Boost" — apuesta con mayor probabilidad de Core
+## 2. "Core Boost" — apuesta con mayor probabilidad de Core
 
 **Qué es:** pagar un multiplicador de apuesta (ej. 1.25x-1.5x) a cambio de asegurar al menos 1 Core AI por giro (o subir su probabilidad base).
 
@@ -43,14 +27,13 @@ Documento de trabajo, no implementado todavía. Cada sección tiene el diseño p
 
 **Casos borde:**
 - Al forzar un Core donde había otro símbolo, ese símbolo "desaparece" — hay que decidir si eso puede romper una línea que ya estaba formada antes de forzar el Core (probablemente sí, y hay que aceptarlo como parte del feature, documentado).
-- El costo extra de este modo tiene que calibrarse con su propia simulación (correr `spin` con el flag activado miles de veces y medir cuánto sube el RTP efectivo) — no alcanza con "se siente razonable".
+- El costo extra de este modo tiene que calibrarse con su propia simulación (correr `spin` con el flag activado miles de veces y medir cuánto sube el RTP efectivo) — no alcanza con "se siente razonable". Mismo método que se usó para calibrar Buy Bonus (NCR-E11, D-21): medir, no asumir.
 - Interacción con Buy Bonus: ¿se pueden combinar los dos boosts en el mismo giro? Si sí, hay que simular esa combinación también, no asumir que los costos se suman linealmente.
 
 ---
 
 ## Cómo se prioriza esto
 
-Ninguna de las 3 depende de las otras para arrancar, salvo que **Buy Bonus y Core Boost necesitan su propia sesión de simulación** (como la que ya hicimos para D-19) antes de poder darlos por terminados — no se calibran a ojo. El VFX de líneas no requiere simulación nueva, pero probablemente convenga esperarlo hasta tener arte real de Figma.
+Ninguna de las 2 depende de la otra para arrancar. Core Boost necesita su propia sesión de simulación (mismo método que Buy Bonus) antes de darse por terminada — no se calibra a ojo. El VFX de líneas no requiere simulación nueva, pero probablemente convenga esperarlo hasta tener arte real de Figma.
 
-*(El selector de apuesta que estaba acá se implementó — ver NCR-E13 en `epics.md`.)*
-
+*(El selector de apuesta y Buy Bonus que estaban acá se implementaron — ver NCR-E13 y NCR-E11 en `epics.md`.)*

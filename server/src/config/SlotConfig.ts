@@ -44,3 +44,8 @@ export const BET_STEPS = [0.1, 0.2, 0.5, 1, 2, 5, 10];
 // Multi-moneda queda fuera de esta iteración — ver pending-features-plan.md.
 export const MIN_TOPUP_AMOUNT = 1;
 export const MAX_TOPUP_AMOUNT = 100000;
+
+// NCR-E11 — Buy Bonus: costo de activar Free Spins directamente, en múltiplos de la
+// apuesta total (betPerLine * 12). Calibrado con npm run simulate para que el RTP de
+// la compra sea igual al RTP general del juego — no es un número arbitrario, ver D-21.
+export const BUY_BONUS_MULTIPLIER = 29.5;

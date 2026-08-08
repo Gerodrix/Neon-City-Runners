@@ -1,9 +1,9 @@
 import express from 'express';
 import cors from 'cors';
-import { spin } from './slot/SlotEngine.js';
+import { spin, buyBonus } from './slot/SlotEngine.js';
 import { spinFreeSpins } from './slot/FreeSpinsLogic.js';
 import { getOrCreateBalance, adjustBalance } from './slot/PlayerBalance.js';
-import { MIN_BET_PER_LINE, MAX_BET_PER_LINE, BET_STEPS, MIN_TOPUP_AMOUNT, MAX_TOPUP_AMOUNT } from './config/SlotConfig.js';
+import { MIN_BET_PER_LINE, MAX_BET_PER_LINE, BET_STEPS, MIN_TOPUP_AMOUNT, MAX_TOPUP_AMOUNT, BUY_BONUS_MULTIPLIER } from './config/SlotConfig.js';
 
 const app = express();
 const PORT = 4000;
@@ -14,7 +14,12 @@ app.use(express.json());
 // El frontend pide los límites acá en vez de hardcodearlos — si el servidor
 // cambia BET_STEPS/MIN/MAX, la UI se actualiza sola sin tocar el cliente.
 app.get('/bet-config', (_req, res) => {
-  res.json({ minBetPerLine: MIN_BET_PER_LINE, maxBetPerLine: MAX_BET_PER_LINE, betSteps: BET_STEPS });
+  res.json({
+    minBetPerLine: MIN_BET_PER_LINE,
+    maxBetPerLine: MAX_BET_PER_LINE,
+    betSteps: BET_STEPS,
+    buyBonusMultiplier: BUY_BONUS_MULTIPLIER,
+  });
 });
 
 app.get('/topup-config', (_req, res) => {
@@ -65,6 +70,28 @@ app.post('/spin', (req, res) => {
   }
 
   const response = spin(betPerLine, playerId);
+
+  if (!response.ok) {
+    return res.status(400).json({ error: response.error });
+  }
+
+  res.json(response.result);
+});
+
+app.post('/buy-bonus', (req, res) => {
+  const betPerLine = Number(req.body?.betPerLine ?? 1);
+  const playerId = String(req.body?.playerId ?? '');
+
+  if (!playerId) {
+    return res.status(400).json({ error: 'playerId es requerido' });
+  }
+  if (!Number.isFinite(betPerLine) || betPerLine < MIN_BET_PER_LINE || betPerLine > MAX_BET_PER_LINE) {
+    return res
+      .status(400)
+      .json({ error: `betPerLine debe estar entre ${MIN_BET_PER_LINE} y ${MAX_BET_PER_LINE}` });
+  }
+
+  const response = buyBonus(betPerLine, playerId);
 
   if (!response.ok) {
     return res.status(400).json({ error: response.error });

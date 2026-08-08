@@ -79,6 +79,16 @@ const hitFrequency = (baseWinningSpins / SPIN_COUNT) * 100;
 const triggerFrequency = (freeSpinsTriggeredCount / SPIN_COUNT) * 100;
 const spinsPerTrigger = triggerFrequency > 0 ? (100 / triggerFrequency).toFixed(0) : 'N/A';
 
+// NCR-E11 — Buy Bonus: cuánto debería costar activar la ronda directamente,
+// para que el RTP de la compra sea igual al RTP general del juego (no más barato
+// ni más caro que jugarlo orgánicamente — precio "justo", no predatorio).
+// Se usa el RTP ya validado (D-19, 95.99% agrupando 15M de giros) como objetivo fijo,
+// no el RTP de esta corrida puntual — mismo criterio que el resto de la documentación.
+const VALIDATED_GAME_RTP = 0.9599;
+const averageBonusWinInBetUnits =
+  freeSpinsTriggeredCount > 0 ? freeSpinsWinTotal / freeSpinsTriggeredCount / BET_PER_BASE_SPIN : 0;
+const suggestedBuyBonusMultiplier = averageBonusWinInBetUnits / VALIDATED_GAME_RTP;
+
 console.log('='.repeat(60));
 console.log(`Neon City Runners — Simulación Monte Carlo`);
 console.log('='.repeat(60));
@@ -100,4 +110,9 @@ for (let position = 0; position < FREE_SPINS_AWARDED; position++) {
     `  Giro ${position + 1}/${FREE_SPINS_AWARDED}: promedio ${avg.toFixed(3)} | % de giros en 0: ${zeroPct.toFixed(1)}% | muestras: ${count.toLocaleString('es-AR')}`
   );
 }
+console.log('='.repeat(60));
+console.log('NCR-E11 — Buy Bonus (precio sugerido):');
+console.log(`  Ganancia promedio de una ronda de FS: ${averageBonusWinInBetUnits.toFixed(2)}x la apuesta total`);
+console.log(`  RTP objetivo para la compra:          ${(VALIDATED_GAME_RTP * 100).toFixed(2)}% (fijo, igual al RTP general validado)`);
+console.log(`  Multiplicador sugerido:                ${suggestedBuyBonusMultiplier.toFixed(1)}x la apuesta total`);
 console.log('='.repeat(60));

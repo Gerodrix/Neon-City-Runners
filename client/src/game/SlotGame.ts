@@ -82,6 +82,7 @@ export class SlotGame {
   private betIndex = 3; // arranca en 1 (índice del array por defecto)
   private minTopupAmount = 1;
   private maxTopupAmount = 100000;
+  private buyBonusMultiplier = 0; // 0 hasta que /bet-config responda — el botón queda deshabilitado mientras tanto
   private isSpinning = false;
   private wasInsufficientFunds = false;
 
@@ -103,6 +104,7 @@ export class SlotGame {
     this.bindSpinButton();
     this.bindTopupControl();
     this.bindBetControls();
+    this.bindBuyBonusButton();
     this.loadBetConfig();
     this.loadTopupConfig();
     this.loadInitialBalance();
@@ -112,8 +114,10 @@ export class SlotGame {
     try {
       const response = await fetch(`${SERVER_URL}/bet-config`);
       if (!response.ok) throw new Error(`Error del servidor: ${response.status}`);
-      const data: { minBetPerLine: number; maxBetPerLine: number; betSteps: number[] } = await response.json();
+      const data: { minBetPerLine: number; maxBetPerLine: number; betSteps: number[]; buyBonusMultiplier: number } =
+        await response.json();
       this.betSteps = data.betSteps;
+      this.buyBonusMultiplier = data.buyBonusMultiplier;
       this.betIndex = Math.min(this.betIndex, this.betSteps.length - 1);
       this.updateBetDisplay();
       this.refreshSpinAvailability();
@@ -202,6 +206,21 @@ export class SlotGame {
     }
 
     this.wasInsufficientFunds = insufficientNow;
+    this.refreshBuyBonusAvailability();
+  }
+
+  private refreshBuyBonusAvailability(): void {
+    const button = document.getElementById('buy-bonus-btn') as HTMLButtonElement;
+
+    if (this.buyBonusMultiplier <= 0) {
+      button.textContent = 'Comprar Bonus (—)';
+      button.disabled = true;
+      return;
+    }
+
+    const cost = this.betPerLine * 12 * this.buyBonusMultiplier;
+    button.textContent = `Comprar Bonus (${cost.toFixed(2)})`;
+    button.disabled = this.isSpinning || this.balance < cost;
   }
 
   // ---------- Selector de apuesta ----------
@@ -405,6 +424,57 @@ export class SlotGame {
     this.app.stage.removeChild(text);
   }
 
+  // ---------- Buy Bonus (NCR-E11) ----------
+
+  private bindBuyBonusButton(): void {
+    const button = document.getElementById('buy-bonus-btn') as HTMLButtonElement;
+    button.addEventListener('click', () => this.handleBuyBonus(button));
+  }
+
+  private async handleBuyBonus(button: HTMLButtonElement): Promise<void> {
+    if (this.isSpinning) return;
+    this.isSpinning = true;
+    button.disabled = true;
+    (document.getElementById('spin-btn') as HTMLButtonElement).disabled = true;
+    this.updateBetDisplay();
+
+    try {
+      const response = await fetch(`${SERVER_URL}/buy-bonus`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ betPerLine: this.betPerLine, playerId: this.playerId }),
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({ error: 'Error desconocido' }));
+        throw new Error(errorBody.error ?? `Error del servidor: ${response.status}`);
+      }
+
+      const result: { spinId: string; buyCost: number; freeSpinsSessionId: string; balance: number } =
+        await response.json();
+      console.log('Bonus comprado:', result);
+
+      this.balance = result.balance;
+      this.updateUI(-result.buyCost);
+      this.refreshSpinAvailability();
+
+      await this.showAccessGrantedOverlay();
+      await this.playFreeSpinsRound(result.freeSpinsSessionId);
+    } catch (error) {
+      console.error('Error al comprar el bonus:', error);
+      const message = error instanceof Error ? error.message : 'Error al comprar el bonus';
+      this.setFreeSpinsStatus(`⚠️ ${message}`);
+
+      if (message !== 'Saldo insuficiente') {
+        this.delay2500ThenHideIfNotInsufficient();
+      }
+    } finally {
+      this.isSpinning = false;
+      this.refreshSpinAvailability();
+      this.updateBetDisplay();
+    }
+  }
+
   // ---------- Flujo principal ----------
 
   private bindSpinButton(): void {
@@ -416,6 +486,7 @@ export class SlotGame {
     if (this.isSpinning) return;
     this.isSpinning = true;
     button.disabled = true;
+    (document.getElementById('buy-bonus-btn') as HTMLButtonElement).disabled = true;
     this.updateBetDisplay(); // bloquea también los botones de apuesta mientras gira
 
     try {

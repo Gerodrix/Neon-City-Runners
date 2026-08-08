@@ -1,4 +1,4 @@
-import { GRID_REELS, GRID_ROWS, REEL_STRIP_COUNTS, CORE_MIN_WILDS, CORE_MAX_WILDS, SCATTER_MIN_TO_TRIGGER, FREE_SPINS_AWARDED, SCATTER_PAYOUT_MULTIPLIER } from '../config/SlotConfig.js';
+import { GRID_REELS, GRID_ROWS, REEL_STRIP_COUNTS, CORE_MIN_WILDS, CORE_MAX_WILDS, SCATTER_MIN_TO_TRIGGER, FREE_SPINS_AWARDED, SCATTER_PAYOUT_MULTIPLIER, BUY_BONUS_MULTIPLIER } from '../config/SlotConfig.js';
 import { SymbolId, SYMBOL_DEFINITIONS } from './Symbol.js';
 import { buildReelStrip, spinReel } from './ReelStrip.js';
 import { PAYLINES } from './Paylines.js';
@@ -213,6 +213,48 @@ export function spin(betPerLine: number, playerId: string): SpinResponse {
       freeSpinsTriggered,
       freeSpinsAwarded,
       freeSpinsSessionId: freeSpinsSession?.sessionId ?? null,
+      balance,
+    },
+  };
+}
+
+export interface BuyBonusResult {
+  spinId: string;
+  buyCost: number;
+  freeSpinsAwarded: number;
+  freeSpinsSessionId: string;
+  balance: number;
+}
+
+export type BuyBonusResponse =
+  | { ok: true; result: BuyBonusResult }
+  | { ok: false; error: string };
+
+/**
+ * NCR-E11 — Activa una ronda de Free Spins directamente, sin necesidad de 3+ Scatter,
+ * a cambio de un costo fijo en múltiplos de la apuesta total. El precio (BUY_BONUS_MULTIPLIER)
+ * está calibrado por simulación para que el RTP de la compra sea igual al RTP general
+ * del juego — no es un número puesto a ojo (ver GDD, D-21).
+ */
+export function buyBonus(betPerLine: number, playerId: string): BuyBonusResponse {
+  const totalBet = betPerLine * PAYLINES.length;
+  const buyCost = totalBet * BUY_BONUS_MULTIPLIER;
+  const currentBalance = getOrCreateBalance(playerId);
+
+  if (currentBalance < buyCost) {
+    return { ok: false, error: 'Saldo insuficiente' };
+  }
+
+  const freeSpinsSession = createFreeSpinsSession(betPerLine, FREE_SPINS_AWARDED, playerId);
+  const balance = adjustBalance(playerId, -buyCost);
+
+  return {
+    ok: true,
+    result: {
+      spinId: randomUUID(),
+      buyCost,
+      freeSpinsAwarded: FREE_SPINS_AWARDED,
+      freeSpinsSessionId: freeSpinsSession.sessionId,
       balance,
     },
   };

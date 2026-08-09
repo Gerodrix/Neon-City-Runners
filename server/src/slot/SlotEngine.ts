@@ -220,6 +220,9 @@ export function spin(betPerLine: number, playerId: string): SpinResponse {
 
 export interface BuyBonusResult {
   spinId: string;
+  grid: SymbolId[][];
+  corePositions: GridPosition[];
+  coreWildPositions: GridPosition[];
   buyCost: number;
   freeSpinsAwarded: number;
   freeSpinsSessionId: string;
@@ -231,10 +234,47 @@ export type BuyBonusResponse =
   | { ok: false; error: string };
 
 /**
+ * Fuerza suficientes Scatter en el grid para llegar al mínimo de trigger (3+),
+ * sin pisar Cores ni Scatters que ya hayan caído naturalmente. Solo se usa en
+ * Buy Bonus — el giro normal nunca fuerza nada, ahí el trigger es 100% orgánico.
+ */
+function forceScatterTrigger(grid: SymbolId[][]): void {
+  const totalPositions = GRID_REELS * GRID_ROWS;
+  let scatterCount = 0;
+  const candidatePositions: number[] = [];
+
+  for (let reel = 0; reel < GRID_REELS; reel++) {
+    for (let row = 0; row < GRID_ROWS; row++) {
+      const symbol = grid[reel][row];
+      if (symbol === 'SCATTER') scatterCount++;
+      else if (symbol !== 'CORE') candidatePositions.push(toIndex(reel, row));
+    }
+  }
+
+  if (scatterCount >= SCATTER_MIN_TO_TRIGGER) return;
+
+  const shuffled = RNG.shuffle(candidatePositions);
+  let i = 0;
+  while (scatterCount < SCATTER_MIN_TO_TRIGGER && i < shuffled.length) {
+    const index = shuffled[i++];
+    const reel = Math.floor(index / GRID_ROWS);
+    const row = index % GRID_ROWS;
+    grid[reel][row] = 'SCATTER';
+    scatterCount++;
+  }
+}
+
+/**
  * NCR-E11 — Activa una ronda de Free Spins directamente, sin necesidad de 3+ Scatter,
  * a cambio de un costo fijo en múltiplos de la apuesta total. El precio (BUY_BONUS_MULTIPLIER)
  * está calibrado por simulación para que el RTP de la compra sea igual al RTP general
  * del juego — no es un número puesto a ojo (ver GDD, D-21).
+ *
+ * D-23: el giro que confirma la compra es puramente visual — genera un grid con el
+ * trigger garantizado (como en cualquier slot real al comprar el bonus), pero NO evalúa
+ * líneas ni paga nada por ese giro. El precio ya está calibrado asumiendo que lo único
+ * que se compra es la ronda de Free Spins — pagar líneas acá encima rompería esa
+ * calibración y regalaría valor no contemplado en D-21.
  */
 export function buyBonus(betPerLine: number, playerId: string): BuyBonusResponse {
   const totalBet = betPerLine * PAYLINES.length;
@@ -245,6 +285,11 @@ export function buyBonus(betPerLine: number, playerId: string): BuyBonusResponse
     return { ok: false, error: 'Saldo insuficiente' };
   }
 
+  const grid = generateGrid();
+  forceScatterTrigger(grid);
+  const corePositions = findCorePositions(grid);
+  const coreWildPositions = applyCoreWildGeneration(grid, corePositions);
+
   const freeSpinsSession = createFreeSpinsSession(betPerLine, FREE_SPINS_AWARDED, playerId);
   const balance = adjustBalance(playerId, -buyCost);
 
@@ -252,6 +297,9 @@ export function buyBonus(betPerLine: number, playerId: string): BuyBonusResponse
     ok: true,
     result: {
       spinId: randomUUID(),
+      grid,
+      corePositions,
+      coreWildPositions,
       buyCost,
       freeSpinsAwarded: FREE_SPINS_AWARDED,
       freeSpinsSessionId: freeSpinsSession.sessionId,

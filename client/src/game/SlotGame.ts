@@ -274,25 +274,40 @@ export class SlotGame {
     const cell = this.cellContainers[reel][row];
     cell.removeChildren();
 
-    if (!symbol) {
-      cell.addChild(new Graphics().rect(0, 0, CELL_SIZE - 8, CELL_SIZE - 8).fill({ color: 0x1a1a2a }));
-      return;
-    }
+    const cellSize = CELL_SIZE - 8;
+
+    // Marco uniforme detrás de TODO — sin esto, los retratos (Runner, CyberDog...) se ven
+    // "pelados" al lado de A/K/Q/J/WILD, que ya traen su propio borde HUD dibujado en el PNG.
+    // Con este fondo + inset parejo, todas las celdas quedan con el mismo peso visual
+    // sin tener que volver a tocar ninguna imagen.
+    const frame = new Graphics()
+      .roundRect(0, 0, cellSize, cellSize, 6)
+      .fill({ color: 0x0f0f1a })
+      .stroke({ width: 1.5, color: 0x33f2c7, alpha: 0.35 });
+    cell.addChild(frame);
+
+    if (!symbol) return; // celda vacía: queda solo el marco, como placeholder
+
+    const inset = 6;
+    const innerSize = cellSize - inset * 2;
 
     const texture = getSymbolTexture(symbol);
     if (texture) {
       const sprite = new Sprite(texture);
-      sprite.width = CELL_SIZE - 8;
-      sprite.height = CELL_SIZE - 8;
+      sprite.width = innerSize;
+      sprite.height = innerSize;
+      sprite.x = inset;
+      sprite.y = inset;
       cell.addChild(sprite);
       return;
     }
 
     const color = SYMBOL_COLORS[symbol] ?? 0x444455;
-    cell.addChild(new Graphics().rect(0, 0, CELL_SIZE - 8, CELL_SIZE - 8).fill({ color }));
+    const swatch = new Graphics().roundRect(inset, inset, innerSize, innerSize, 4).fill({ color });
+    cell.addChild(swatch);
     const label = new Text({ text: symbol, style: { fontSize: 12, fill: 0xffffff } });
-    label.x = 6;
-    label.y = 6;
+    label.x = inset + 4;
+    label.y = inset + 4;
     cell.addChild(label);
   }
 
@@ -450,13 +465,25 @@ export class SlotGame {
         throw new Error(errorBody.error ?? `Error del servidor: ${response.status}`);
       }
 
-      const result: { spinId: string; buyCost: number; freeSpinsSessionId: string; balance: number } =
-        await response.json();
+      const result: {
+        spinId: string;
+        grid: string[][];
+        corePositions: GridPosition[];
+        coreWildPositions: GridPosition[];
+        buyCost: number;
+        freeSpinsSessionId: string;
+        balance: number;
+      } = await response.json();
       console.log('Bonus comprado:', result);
 
       this.balance = result.balance;
-      this.updateUI(-result.buyCost);
       this.refreshSpinAvailability();
+
+      // Giro visual que confirma la compra (con el trigger garantizado) — no paga
+      // líneas, el precio ya cubre solo la ronda de Free Spins (ver GDD, D-23).
+      await this.animateSpinAndReveal(result.grid);
+      this.updateUI(-result.buyCost);
+      await this.playCoreEffects(result.corePositions, result.coreWildPositions);
 
       await this.showAccessGrantedOverlay();
       await this.playFreeSpinsRound(result.freeSpinsSessionId);

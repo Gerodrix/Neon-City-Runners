@@ -4,18 +4,18 @@ Documento de trabajo, no implementado todavía. Cada sección tiene el diseño p
 
 ---
 
-## 1. VFX: líneas glitcheadas conectando nodos
+## 1. VFX: línea que conecte los nodos ganadores (pendiente — lo demás ya se hizo)
 
-**Reemplaza:** el highlight actual (`highlightWinningLines` en `SlotGame.ts`), que dibuja un rectángulo con glow en cada celda ganadora por separado, sin conectarlas.
+**Ya implementado** (NCR-S10.1 a S10.3): el "pop" de escala y las partículas por celda ganadora, el rayo Core→Wild, y el cartel de premio grande. Ver `epics.md`, NCR-E10.
 
-**Objetivo:** dibujar una línea que conecte las celdas ganadoras de izquierda a derecha (como un circuito/nodo de hackeo), con estética glitch, más un "pop" (escala) + parpadeo en cada símbolo de la combinación.
+**Todavía pendiente:** reemplazar el glow-por-celda-suelta actual (`highlightWinningLines` en `SlotGame.ts`) por una línea que conecte las celdas ganadoras de izquierda a derecha (como un circuito/nodo de hackeo), en vez de resaltarlas por separado sin conexión visual entre ellas.
 
 **Ya tenemos la base necesaria:** el backend manda `positions` exacto por cada `lineWin` (D-18) — no hay que calcular geometría de líneas en el cliente, solo conectar los puntos que ya vienen.
 
 **Casos borde a resolver:**
 - Las líneas no son todas horizontales — hay zigzags (ver `Paylines.ts`: patrones como `[0,1,2,1,0]`). El trazo tiene que seguir el `row` real de cada `position`, no asumir una fila fija.
 - Varias líneas ganadoras a la vez: si se dibujan todas superpuestas se ve como ruido. Alternativas: colores/tonos distintos por línea, o animarlas en secuencia (una después de la otra) en vez de todas juntas.
-- El "pop" de escala en un símbolo que pertenece a *dos* líneas ganadoras a la vez no debería duplicarse/sumarse (spam de animaciones sobre la misma celda) — agrupar por celda antes de animar, no por línea.
+- Ya resuelto en la pasada anterior (no repetir el error): el "pop" agrupa por celda, no por línea, para no duplicar la animación si una celda pertenece a 2+ líneas — aplicar el mismo criterio acá.
 
 ---
 

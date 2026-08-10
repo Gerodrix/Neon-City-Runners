@@ -357,14 +357,25 @@ export class SlotGame {
     });
   }
 
-  // ---------- Efectos: líneas ganadoras, Core AI, Wilds ----------
+  // ---------- Efectos: líneas ganadoras, Core AI, Wilds, cartel de premio ----------
+
+  private cellCenter(pos: GridPosition): { x: number; y: number } {
+    const size = CELL_SIZE - 8;
+    return { x: pos.reel * CELL_SIZE + size / 2, y: pos.row * CELL_SIZE + size / 2 };
+  }
 
   private async highlightWinningLines(lineWins: LineWin[]): Promise<void> {
     if (lineWins.length === 0) return;
 
     const glowRects: Graphics[] = [];
+    // Agrupado por celda (no por línea) — si una celda gana en dos líneas a la vez,
+    // el pop y las partículas no se duplican sobre ella.
+    const uniqueCells = new Map<string, GridPosition>();
+
     for (const lineWin of lineWins) {
       for (const pos of lineWin.positions) {
+        uniqueCells.set(`${pos.reel}-${pos.row}`, pos);
+
         const glow = new Graphics().rect(-4, -4, CELL_SIZE, CELL_SIZE).stroke({ width: 4, color: 0xff2e88 });
         glow.x = pos.reel * CELL_SIZE;
         glow.y = pos.row * CELL_SIZE;
@@ -374,11 +385,68 @@ export class SlotGame {
       }
     }
 
-    await tweenValue(0, 1, 200, (v) => glowRects.forEach((g) => (g.alpha = v)));
-    await delay(500);
+    const cells = Array.from(uniqueCells.values());
+
+    await Promise.all([
+      tweenValue(0, 1, 200, (v) => glowRects.forEach((g) => (g.alpha = v))),
+      ...cells.map((pos) => this.popCell(pos)),
+      ...cells.map((pos) => this.spawnParticleBurst(pos)),
+    ]);
+    await delay(400);
     await tweenValue(1, 0, 300, (v) => glowRects.forEach((g) => (g.alpha = v)));
 
     glowRects.forEach((g) => this.fxLayer.removeChild(g));
+  }
+
+  /** Pequeño "pop" de escala en la celda — refuerza visualmente que ese símbolo formó parte de un premio. */
+  private async popCell(pos: GridPosition): Promise<void> {
+    const cell = this.cellContainers[pos.reel][pos.row];
+    const size = CELL_SIZE - 8;
+    const baseX = pos.reel * CELL_SIZE;
+    const baseY = pos.row * CELL_SIZE;
+
+    cell.pivot.set(size / 2, size / 2);
+    cell.x = baseX + size / 2;
+    cell.y = baseY + size / 2;
+
+    await tweenValue(1, 1.15, 150, (v) => cell.scale.set(v), Easing.easeOutBack);
+    await tweenValue(1.15, 1, 150, (v) => cell.scale.set(v));
+
+    // Restaurar transform original — si no, el próximo setCellSymbol queda mal posicionado.
+    cell.pivot.set(0, 0);
+    cell.x = baseX;
+    cell.y = baseY;
+  }
+
+  /** Ráfaga de partículas radiando desde el centro de una celda ganadora. */
+  private async spawnParticleBurst(pos: GridPosition): Promise<void> {
+    const center = this.cellCenter(pos);
+    const count = 6;
+    const particlePromises: Promise<void>[] = [];
+
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.4;
+      const distance = 26 + Math.random() * 12;
+      const targetX = center.x + Math.cos(angle) * distance;
+      const targetY = center.y + Math.sin(angle) * distance;
+
+      const particle = new Graphics().circle(0, 0, 3).fill({ color: 0xff2e88 });
+      particle.x = center.x;
+      particle.y = center.y;
+      this.fxLayer.addChild(particle);
+
+      const p = tweenValue(0, 1, 450, (v) => {
+        particle.x = center.x + (targetX - center.x) * v;
+        particle.y = center.y + (targetY - center.y) * v;
+        particle.alpha = 1 - v;
+      }).then(() => {
+        this.fxLayer.removeChild(particle);
+      });
+
+      particlePromises.push(p);
+    }
+
+    await Promise.all(particlePromises);
   }
 
   private async pulseCore(pos: GridPosition): Promise<void> {
@@ -389,6 +457,31 @@ export class SlotGame {
 
     await tweenValue(1, 0, 550, (v) => (ring.alpha = v), Easing.linear);
     this.fxLayer.removeChild(ring);
+  }
+
+  /** Rayo glitch (línea quebrada) desde un Core hasta un Wild que generó — deja claro que uno causó al otro. */
+  private async drawGlitchBeam(from: GridPosition, to: GridPosition): Promise<void> {
+    const p1 = this.cellCenter(from);
+    const p2 = this.cellCenter(to);
+    const segments = 4;
+    const jitter = 14;
+
+    const line = new Graphics();
+    line.moveTo(p1.x, p1.y);
+    for (let i = 1; i <= segments; i++) {
+      const t = i / segments;
+      const jitterX = i < segments ? (Math.random() - 0.5) * jitter * 2 : 0;
+      const jitterY = i < segments ? (Math.random() - 0.5) * jitter * 2 : 0;
+      line.lineTo(p1.x + (p2.x - p1.x) * t + jitterX, p1.y + (p2.y - p1.y) * t + jitterY);
+    }
+    line.stroke({ width: 2, color: 0x33f2c7 });
+    line.alpha = 0;
+    this.fxLayer.addChild(line);
+
+    await tweenValue(0, 1, 90, (v) => (line.alpha = v));
+    await delay(140);
+    await tweenValue(1, 0, 250, (v) => (line.alpha = v));
+    this.fxLayer.removeChild(line);
   }
 
   /** Efecto glitch: la celda parpadea entre colores antes de asentarse en su símbolo final (el Wild). */
@@ -405,13 +498,85 @@ export class SlotGame {
     this.setCellSymbol(pos.reel, pos.row, finalSymbol);
   }
 
+  /**
+   * Secuencia causa->efecto: primero el pulso del Core + el rayo hacia el Wild que va a generar,
+   * y un poco después (120ms, no full-wait, para que no se sienta lento) el Wild arranca su glitch
+   * de asentamiento. Cada wild se conecta con un Core al azar entre los que cayeron — no hace falta
+   * la pareja exacta para que se lea bien, y evita dibujar N×M rayos cuando hay varios Cores juntos.
+   */
   private async playCoreEffects(corePositions: GridPosition[], coreWildPositions: GridPosition[]): Promise<void> {
     if (corePositions.length === 0 && coreWildPositions.length === 0) return;
 
+    const beamPromises =
+      corePositions.length > 0
+        ? coreWildPositions.map((wildPos) => {
+            const fromCore = corePositions[Math.floor(Math.random() * corePositions.length)];
+            return this.drawGlitchBeam(fromCore, wildPos);
+          })
+        : [];
+    const pulsePromises = corePositions.map((pos) => this.pulseCore(pos));
+
+    await delay(120);
+    const flickerPromises = coreWildPositions.map((pos) => this.glitchFlicker(pos, 'WILD'));
+
+    await Promise.all([...beamPromises, ...pulsePromises, ...flickerPromises]);
+  }
+
+  /** Cartel de premio grande con contador, entre giros — solo aparece si el premio supera 3x la apuesta total. */
+  private async showWinBanner(winAmount: number, totalBet: number): Promise<void> {
+    const ratio = totalBet > 0 ? winAmount / totalBet : 0;
+    let label = '';
+    let color = 0x33f2c7;
+
+    if (ratio >= 50) {
+      label = 'EPIC WIN';
+      color = 0xffee00;
+    } else if (ratio >= 20) {
+      label = 'MEGA WIN';
+      color = 0xff2e88;
+    } else if (ratio >= 8) {
+      label = 'BIG WIN';
+      color = 0x8a2eff;
+    } else if (ratio >= 3) {
+      label = 'NICE WIN';
+      color = 0x33f2c7;
+    } else {
+      return; // no amerita cartel — el highlight de línea ya alcanza para premios chicos
+    }
+
+    const title = new Text({
+      text: label,
+      style: { fontSize: 36, fontWeight: 'bold', fill: color, stroke: { color: 0x0a0a12, width: 4 } },
+    });
+    title.anchor.set(0.5);
+    title.x = this.app.screen.width / 2;
+    title.y = this.app.screen.height / 2 - 30;
+    title.alpha = 0;
+    title.scale.set(0.5);
+    this.app.stage.addChild(title);
+
+    const amountText = new Text({ text: '0.00', style: { fontSize: 26, fontWeight: 'bold', fill: 0xffffff } });
+    amountText.anchor.set(0.5);
+    amountText.x = this.app.screen.width / 2;
+    amountText.y = this.app.screen.height / 2 + 20;
+    amountText.alpha = 0;
+    this.app.stage.addChild(amountText);
+
     await Promise.all([
-      ...corePositions.map((pos) => this.pulseCore(pos)),
-      ...coreWildPositions.map((pos) => this.glitchFlicker(pos, 'WILD')),
+      tweenValue(0, 1, 300, (v) => (title.alpha = v)),
+      tweenValue(0.5, 1, 300, (v) => title.scale.set(v), Easing.easeOutBack),
     ]);
+    amountText.alpha = 1;
+    await tweenValue(0, winAmount, 900, (v) => (amountText.text = v.toFixed(2)));
+
+    await delay(900);
+
+    await Promise.all([
+      tweenValue(1, 0, 400, (v) => (title.alpha = v)),
+      tweenValue(1, 0, 400, (v) => (amountText.alpha = v)),
+    ]);
+    this.app.stage.removeChild(title);
+    this.app.stage.removeChild(amountText);
   }
 
   private async showAccessGrantedOverlay(): Promise<void> {
@@ -539,6 +704,7 @@ export class SlotGame {
 
       await this.highlightWinningLines(result.lineWins);
       await this.playCoreEffects(result.corePositions, result.coreWildPositions);
+      await this.showWinBanner(result.totalWin, this.betPerLine * 12);
 
       if (result.freeSpinsTriggered && result.freeSpinsSessionId) {
         await this.showAccessGrantedOverlay();
@@ -594,12 +760,14 @@ export class SlotGame {
 
       await this.highlightWinningLines(result.lineWins);
       await this.playCoreEffects(result.corePositions, result.coreWildPositions);
+      await this.showWinBanner(result.spinWin, this.betPerLine * 12);
 
       if (result.sessionOver) {
         this.balance = result.balance;
         this.updateUI(result.sessionTotalWin);
         this.setFreeSpinsStatus(`Heist completado — Ganancia total: ${result.sessionTotalWin.toFixed(2)}`);
-        await delay(2000);
+        await this.showWinBanner(result.sessionTotalWin, this.betPerLine * 12);
+        await delay(1200);
         this.hideFreeSpinsStatus();
         break;
       }

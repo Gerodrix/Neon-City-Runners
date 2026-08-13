@@ -177,6 +177,8 @@ Formato: cada Epic agrupa historias de usuario con criterios de aceptación. Los
   *Criterios de aceptación:* cartel con contador animado, aparece en base game, en cada giro de Free Spins, y en el total de la ronda; umbral proporcional a la apuesta total (3x/8x/20x/50x). ✅ (D-26)
 - **NCR-S10.4 (pendiente)** — Línea que conecte los nodos ganadores de una combinación (izquierda a derecha, estilo circuito de hackeo), reemplazando el glow por celda suelta. Ver `pending-features-plan.md`.
 - **NCR-S10.5 (pendiente)** — Marca visual persistente para Cores sticky en Free Spins, distinta a un Core recién caído. Se posterga hasta reencuadrar el arte final.
+- **NCR-S10.6** — Como jugador, quiero que el Wild se sienta transformado por el Core, no que aparezca directo al parar el rodillo.
+  *Criterios de aceptación:* durante el blur de giro y al asentarse, las celdas que van a ser Wild muestran un símbolo normal; recién el efecto del Core las transforma. ✅ (D-29)
 
 ---
 
@@ -184,3 +186,18 @@ Formato: cada Epic agrupa historias de usuario con criterios de aceptación. Los
 **Estado:** 🔲 To Do (diseño ya pensado, sin implementar)
 
 Core Boost necesita su propia sesión de simulación antes de darse por terminada — no se calibra a ojo, mismo criterio que D-19/D-21.
+
+---
+
+## NCR-E14 — Corrección: Core en la columna 1 anulaba todas las líneas (D-27)
+**Estado:** ✅ Done
+**Objetivo:** un Core en el rodillo 1 mataba las 12 líneas de una sola vez — mucho peor que en cualquier otra columna, y frustrante para el jugador.
+
+- **NCR-S14.1** — Como desarrollador, quiero confirmar que los Cores nunca pisan Wilds ya generados en el mismo giro (duda planteada, no un bug).
+  *Criterios de aceptación:* test dedicado sobre 200k giros con 2+ Cores. ✅ 0 pisadas — ya estaba bien.
+- **NCR-S14.2** — Como desarrollador, quiero medir el impacto real de un Core en la columna 1, no asumirlo.
+  *Criterios de aceptación:* test controlado (mismo grid real vs. grid hipotético con Wild en vez de Core en esa celda). ✅ 47% menos de ganancia esperada en esos giros — confirmado, no solo intuición.
+- **NCR-S14.3** — Como jugador, quiero que el rodillo 1 nunca tenga Core, para que ninguna columna pueda anular las 12 líneas de una sola vez.
+  *Criterios de aceptación:* `REEL_0_STRIP_COUNTS` sin Core; confirmado 0 apariciones en 100k giros. ✅ (D-27)
+- **NCR-S14.4** — Como desarrollador, quiero recalibrar el RTP general y el precio de Buy Bonus tras el cambio.
+  *Criterios de aceptación:* RTP agrupado dentro de un rango razonable del objetivo; `BUY_BONUS_MULTIPLIER` actualizado. ✅ RTP 97.06% (30M de giros), Buy Bonus 32.0x (D-28).

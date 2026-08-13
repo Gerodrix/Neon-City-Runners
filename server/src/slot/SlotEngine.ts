@@ -1,4 +1,4 @@
-import { GRID_REELS, GRID_ROWS, REEL_STRIP_COUNTS, CORE_MIN_WILDS, CORE_MAX_WILDS, SCATTER_MIN_TO_TRIGGER, FREE_SPINS_AWARDED, SCATTER_PAYOUT_MULTIPLIER, BUY_BONUS_MULTIPLIER } from '../config/SlotConfig.js';
+import { GRID_REELS, GRID_ROWS, REEL_STRIP_COUNTS, REEL_0_STRIP_COUNTS, CORE_MIN_WILDS, CORE_MAX_WILDS, SCATTER_MIN_TO_TRIGGER, FREE_SPINS_AWARDED, SCATTER_PAYOUT_MULTIPLIER, BUY_BONUS_MULTIPLIER } from '../config/SlotConfig.js';
 import { SymbolId, SYMBOL_DEFINITIONS } from './Symbol.js';
 import { buildReelStrip, spinReel } from './ReelStrip.js';
 import { PAYLINES } from './Paylines.js';
@@ -44,7 +44,11 @@ export type SpinResponse =
   | { ok: false; error: string };
 
 // Un strip por rodillo. En v1 los 5 usan el mismo conteo de símbolos.
-const REEL_STRIPS: SymbolId[][] = Array.from({ length: GRID_REELS }, () => buildReelStrip(REEL_STRIP_COUNTS));
+// Un strip por rodillo. El rodillo 1 (índice 0) usa su propio strip sin Core (D-27);
+// los rodillos 2 a 5 comparten la misma distribución.
+const REEL_STRIPS: SymbolId[][] = Array.from({ length: GRID_REELS }, (_, index) =>
+  buildReelStrip(index === 0 ? REEL_0_STRIP_COUNTS : REEL_STRIP_COUNTS)
+);
 
 function toIndex(reel: number, row: number): number {
   return reel * GRID_ROWS + row;

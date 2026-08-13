@@ -4,21 +4,39 @@
 
 | Símbolo | Rol | Paga línea (3/4/5) | Sustituye |
 |---|---|---|---|
-| Runner (high) | Alto | 6.7 / 35 / 140 | — |
-| Netrunner (high) | Alto | 5.7 / 27.8 / 106 | — |
-| CyberDog (high) | Medio-alto | 4.5 / 21.6 / 71 | — |
-| Drone (high) | Medio | 2.8 / 14 / 49 | — |
-| A (low) | Bajo | 1.3 / 6.7 / 28 | — |
-| K (low) | Bajo | 1.3 / 5.7 / 22 | — |
-| Q (low) | Bajo | 0.7 / 4.5 / 14 | — |
-| J (low) | Bajo | 0.7 / 2.8 / 11 | — |
-| Glitch (WILD) | Especial | 8.2 / 41 / 165 (v2, ver D-19) | sí, a todo excepto Scatter y Core |
+| Runner (high) | Alto | 8.9 / 46.4 / 185.6 | — |
+| Netrunner (high) | Alto | 7.6 / 36.9 / 140.6 | — |
+| CyberDog (high) | Medio-alto | 5.9 / 28.7 / 94.2 | — |
+| Drone (high) | Medio | 3.7 / 18.5 / 64.9 | — |
+| A (low) | Bajo | 1.8 / 8.9 / 37.1 | — |
+| K (low) | Bajo | 1.8 / 7.6 / 29.2 | — |
+| Q (low) | Bajo | 1 / 5.9 / 18.5 | — |
+| J (low) | Bajo | 1 / 3.7 / 14.6 | — |
+| Glitch (WILD) | Especial | 10.9 / 54.4 / 218.8 | sí, a todo excepto Scatter y Core |
 | Core AI | Generador | sin pago directo | no |
 | Data Vault (SCATTER) | Trigger | 2x / 10x / 50x apuesta total (3/4/5 en cualquier posición) | no |
 
-Pagos en "monedas por línea apostada". **D-19 (corrección post-lanzamiento):** el Wild pasó a tener tabla de pago propia — antes (v1/v2) solo sustituía. Se detectó que en rondas avanzadas de Free Spins, un tablero saturado de Cores+Wilds podía pagar 0 porque nada de lo que lo llenaba tenía valor propio. Ver sección "D-19" más abajo para el detalle completo.
+Pagos en "monedas por línea apostada". **Recalibrados tras D-27** (sacar el Core del rodillo 1 bajó la frecuencia general de Cores ~20%, hubo que subir toda la tabla ~32% para volver a acercarse al objetivo de RTP).
 
-## Reel strips (v2 calibrada, 40 símbolos por rodillo, misma distribución en los 5 rodillos)
+## Reel strips (v3, tras D-27)
+
+**D-27:** el rodillo 1 (el más a la izquierda) no tiene Core AI en su strip. Motivo: como las líneas se evalúan de izquierda a derecha, un Core en la columna 1 mata las 12 líneas a la vez — medido, esto costaba en promedio el 47% de la ganancia esperada de ese giro comparado con si esa celda hubiera sido Wild. Ningún otro rodillo tiene ese problema con el mismo peso (un Core en la columna 3, por ejemplo, todavía deja cobrar con 3 símbolos desde la izquierda). El conteo de Core (2) se redistribuyó en A y K en el rodillo 1.
+
+**Rodillo 1 (sin Core):**
+
+| Símbolo | Cantidad / 40 | Prob. por posición |
+|---|---|---|
+| Runner | 2 | 5% |
+| Netrunner | 3 | 7.5% |
+| CyberDog | 3 | 7.5% |
+| Drone | 4 | 10% |
+| A | 7 | 17.5% |
+| K | 7 | 17.5% |
+| Q | 6 | 15% |
+| J | 7 | 17.5% |
+| Data Vault (Scatter) | 1 | 2.5% |
+
+**Rodillos 2 a 5 (igual entre sí):**
 
 | Símbolo | Cantidad / 40 | Prob. por posición |
 |---|---|---|
@@ -84,6 +102,27 @@ La primera versión de la matemática (Core y Scatter al 5% cada uno, tabla de p
 ### Metodología (para referencia)
 El RTP se compone de: (1) valor esperado de líneas base, (2) contribución del Core AI vía wilds generados, y (3) contribución de Scatter/Free Spins — los tres puntos (2) y (3) no tienen fórmula cerrada simple por la aleatoriedad de posiciones y el estado acumulado entre giros de Free Spins, por eso se miden con simulación en vez de calcularse a mano.
 
+### v3 — D-27: rodillo 1 sin Core (número vigente)
+Se detectó (por observación directa del juego, no por simulación) que un Core en la columna 1 mataba las 12 líneas de una sola vez, con un costo medido del 47% de la ganancia esperada de ese giro. Se sacó el Core del strip del rodillo 1 y se redistribuyó su conteo en A y K. Esto bajó la frecuencia general de Core ~20%, así que hubo que recalibrar:
+
+| Cambio | RTP medido |
+|---|---|
+| Recién sacado el Core del rodillo 1, tabla sin ajustar | 70.72% |
+| Tabla escalada +36% | 98.65% |
+| Ajuste fino -2.5% | 97.43% / 96.68% (dos corridas de 15M) |
+
+**RTP validado (v3): 97.06%**, agrupando 30M de giros. Un poco por encima del objetivo de 96% pero dentro de un margen razonable — no se lo sobre-ajustó más, mismo criterio que en v2 de no perseguir el último decimal a costa de correr simulaciones indefinidamente.
+
+Métricas estables de la v3 (10M de giros):
+
+| Métrica | Valor |
+|---|---|
+| Hit frequency (base game) | ~51-52% (bajó de ~57% en v2 — menos Cores generando menos wilds en el rodillo 1) |
+| Frecuencia de trigger de Free Spins | ~0.86% — sin cambios, el Scatter no se tocó |
+| Aporte de Free Spins al RTP | ~26-27% (subió del ~12% de v2 — las rondas de FS ahora pagan mucho mejor al no perder líneas por el rodillo 1) |
+
+**Buy Bonus recalibrado también:** el precio (D-21) dependía de cuánto paga en promedio una ronda de FS, que subió de 28.42x a ~31.5x la apuesta tras esta corrección. Nuevo multiplicador: **32.0x** (antes 29.5x) — ver GDD, D-28.
+
 ## D-19 — Corrección de la saturación de Free Spins (post-lanzamiento)
 
 **Síntoma real observado:** en una ronda de Free Spins, el tablero llegó a estar 100% ocupado por Core AI y Wild — ni un solo símbolo normal en las 20 celdas. Como en ese momento (v1/v2) ni el Core ni el Wild pagaban por sí mismos, ese giro no podía pagar nada por más lleno de símbolos especiales que estuviera el tablero. Esto era el hallazgo D-08 llevado a su caso extremo.
@@ -98,20 +137,20 @@ El RTP se compone de: (1) valor esperado de líneas base, (2) contribución del 
 
 **Resultado medido (15M de giros agrupados, misma metodología que el RTP general):**
 
-| Giro dentro de la ronda | Antes (D-08 original) | Después (D-19) |
-|---|---|---|
-| 1 | 9.90 | 8.72 |
-| 2 | 23.71 | 20.18 |
-| 3 | 31.90 | 32.65 |
-| 4 | 32.05 | 43.44 |
-| 5 | 27.08 | 50.92 |
-| 6 | 20.14 | 55.65 |
-| 7 | 13.90 | 57.16 |
-| 8 | 8.96 | 56.77 |
+| Giro dentro de la ronda | Antes (D-08 original) | Después de D-19 | Después de D-27 (vigente) |
+|---|---|---|---|
+| 1 | 9.90 | 8.72 | 8.22 |
+| 2 | 23.71 | 20.18 | 19.59 |
+| 3 | 31.90 | 32.65 | 33.27 |
+| 4 | 32.05 | 43.44 | 46.66 |
+| 5 | 27.08 | 50.92 | 57.42 |
+| 6 | 20.14 | 55.65 | 65.33 |
+| 7 | 13.90 | 57.16 | 70.95 |
+| 8 | 8.96 | 56.77 | 72.84 |
 
-Antes, el premio subía hasta el giro 3-4 y después se desplomaba (el pilar de "progresión dentro del bonus" se rompía en la segunda mitad de la ronda). Ahora sube de forma sostenida durante toda la ronda — el diseño finalmente se comporta como se planeó desde el GDD.
+Antes, el premio subía hasta el giro 3-4 y después se desplomaba (el pilar de "progresión dentro del bonus" se rompía en la segunda mitad de la ronda). Con D-19 se sostenía, pero se aplanaba cerca del final. Con D-27 (sin Core en el rodillo 1) sigue subiendo hasta el final de la ronda — ya no se pierden líneas enteras por un Core mal ubicado, así que el crecimiento es más limpio.
 
-**RTP recalibrado tras el cambio:** 95.99%, agrupando 15M de giros (5M + 10M) con la nueva tabla de pagos — dentro del objetivo, sin necesidad de otro ajuste.
+**RTP recalibrado tras D-19:** 95.99% (15M de giros). **RTP recalibrado tras D-27:** 97.06% (30M de giros) — ver sección de RTP más arriba para el detalle completo.
 
 **Limitación que sigue existiendo:** un Core en el medio de una línea todavía la "bloquea" (no paga y no es sustituible) — la corrección reduce mucho la saturación pero no la elimina al 100%. Se evaluó también rediseñar el Core como un multiplicador global en vez de un generador físico de wilds (eliminaría el problema de raíz), pero se descartó para esta versión: es un cambio de identidad de la mecánica central, con riesgo matemático más alto (los multiplicadores acumulativos son notoriamente difíciles de calibrar sin que el RTP se dispare), y hubiera invalidado buena parte de las animaciones y la narrativa ya construidas. Queda anotado como posible dirección de v2 si en el futuro se justifica.
 

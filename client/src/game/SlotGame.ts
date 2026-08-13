@@ -24,7 +24,11 @@ const SYMBOL_COLORS: Record<string, number> = {
 };
 
 // Símbolos que se usan para el "blur" de giro — cualquiera de estos, es solo cosmético.
-const SPIN_CYCLE_POOL = Object.keys(SYMBOL_COLORS);
+// Símbolos que se usan para el "blur" de giro — WILD queda afuera a propósito: nunca
+// está en el reel strip real (solo lo genera el Core), así que tampoco debería aparecer
+// mientras el rodillo gira, como si cayera del carretel.
+const SPIN_CYCLE_POOL = Object.keys(SYMBOL_COLORS).filter((s) => s !== 'WILD');
+const REGULAR_SYMBOLS = ['RUNNER', 'NETRUNNER', 'CYBERDOG', 'DRONE', 'A', 'K', 'Q', 'J'];
 
 interface GridPosition {
   reel: number;
@@ -321,16 +325,26 @@ export class SlotGame {
    * Gira los 5 rodillos con un "blur" de símbolos aleatorios y los va deteniendo
    * en cascada (cada rodillo para un poco después que el anterior), hasta asentarse
    * en el resultado real que ya vino del servidor.
+   *
+   * `wildPositions`: las celdas que el Core convirtió en Wild ese giro. Ahí el rodillo
+   * NO se detiene mostrando el Wild directo — se asienta en un símbolo normal cualquiera,
+   * y es `playCoreEffects` (glitchFlicker) el que lo transforma después. Así se ve al Core
+   * "trabajando" en vez de que el Wild parezca uno más que cayó del carretel.
    */
-  private async animateSpinAndReveal(finalGrid: string[][]): Promise<void> {
+  private async animateSpinAndReveal(finalGrid: string[][], wildPositions: GridPosition[] = []): Promise<void> {
+    const maskSet = new Set(wildPositions.map((p) => `${p.reel}-${p.row}`));
     const reelPromises = Array.from({ length: GRID_REELS }, (_, reel) => {
       const reelDurationMs = 450 + reel * 150; // cascada: reel 0 para primero, reel 4 último
-      return this.spinReelColumn(reel, finalGrid, reelDurationMs);
+      return this.spinReelColumn(reel, finalGrid, reelDurationMs, maskSet);
     });
     await Promise.all(reelPromises);
   }
 
-  private spinReelColumn(reel: number, finalGrid: string[][], durationMs: number): Promise<void> {
+  private randomRegularSymbol(): string {
+    return REGULAR_SYMBOLS[Math.floor(Math.random() * REGULAR_SYMBOLS.length)];
+  }
+
+  private spinReelColumn(reel: number, finalGrid: string[][], durationMs: number, maskSet: Set<string>): Promise<void> {
     const cycleIntervalMs = 55;
 
     return new Promise((resolve) => {
@@ -341,7 +355,9 @@ export class SlotGame {
 
         if (elapsed >= durationMs) {
           for (let row = 0; row < GRID_ROWS; row++) {
-            this.setCellSymbol(reel, row, finalGrid[reel][row]);
+            const isWildToTransform = maskSet.has(`${reel}-${row}`);
+            const displaySymbol = isWildToTransform ? this.randomRegularSymbol() : finalGrid[reel][row];
+            this.setCellSymbol(reel, row, displaySymbol);
           }
           resolve();
           return;
@@ -646,7 +662,7 @@ export class SlotGame {
 
       // Giro visual que confirma la compra (con el trigger garantizado) — no paga
       // líneas, el precio ya cubre solo la ronda de Free Spins (ver GDD, D-23).
-      await this.animateSpinAndReveal(result.grid);
+      await this.animateSpinAndReveal(result.grid, result.coreWildPositions);
       this.updateUI(-result.buyCost);
       await this.playCoreEffects(result.corePositions, result.coreWildPositions);
 
@@ -696,7 +712,7 @@ export class SlotGame {
       const result: SpinResult = await response.json();
       console.log('Resultado del giro:', result);
 
-      await this.animateSpinAndReveal(result.grid);
+      await this.animateSpinAndReveal(result.grid, result.coreWildPositions);
 
       this.balance = result.balance; // saldo autoritativo del servidor, no calculado acá
       this.updateUI(result.totalWin);
@@ -751,7 +767,7 @@ export class SlotGame {
       const result: FreeSpinResult = await response.json();
       console.log('Giro de Free Spins:', result);
 
-      await this.animateSpinAndReveal(result.grid);
+      await this.animateSpinAndReveal(result.grid, result.coreWildPositions);
 
       this.balance = result.balance;
       this.setFreeSpinsStatus(

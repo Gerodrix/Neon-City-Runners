@@ -380,38 +380,78 @@ export class SlotGame {
     return { x: pos.reel * CELL_SIZE + size / 2, y: pos.row * CELL_SIZE + size / 2 };
   }
 
+  private readonly WIN_LINE_COLORS = [0xff2e88, 0x33f2c7, 0x8a2eff, 0xffee00];
+
   private async highlightWinningLines(lineWins: LineWin[]): Promise<void> {
     if (lineWins.length === 0) return;
 
-    const glowRects: Graphics[] = [];
     // Agrupado por celda (no por línea) — si una celda gana en dos líneas a la vez,
     // el pop y las partículas no se duplican sobre ella.
     const uniqueCells = new Map<string, GridPosition>();
-
     for (const lineWin of lineWins) {
       for (const pos of lineWin.positions) {
         uniqueCells.set(`${pos.reel}-${pos.row}`, pos);
-
-        const glow = new Graphics().rect(-4, -4, CELL_SIZE, CELL_SIZE).stroke({ width: 4, color: 0xff2e88 });
-        glow.x = pos.reel * CELL_SIZE;
-        glow.y = pos.row * CELL_SIZE;
-        glow.alpha = 0;
-        this.fxLayer.addChild(glow);
-        glowRects.push(glow);
       }
     }
-
     const cells = Array.from(uniqueCells.values());
 
-    await Promise.all([
-      tweenValue(0, 1, 200, (v) => glowRects.forEach((g) => (g.alpha = v))),
-      ...cells.map((pos) => this.popCell(pos)),
-      ...cells.map((pos) => this.spawnParticleBurst(pos)),
-    ]);
-    await delay(400);
-    await tweenValue(1, 0, 300, (v) => glowRects.forEach((g) => (g.alpha = v)));
+    // Cada línea arranca con un pequeño delay entre sí y un color distinto — si ganan
+    // varias a la vez (común con el tablero cargado de Wilds), no se leen como ruido
+    // superpuesto, se distinguen una de otra.
+    const linePromises = lineWins.map(async (lineWin, index) => {
+      await delay(index * 70);
+      await this.drawWinLine(lineWin.positions, this.WIN_LINE_COLORS[index % this.WIN_LINE_COLORS.length]);
+    });
 
-    glowRects.forEach((g) => this.fxLayer.removeChild(g));
+    await Promise.all([...linePromises, ...cells.map((pos) => this.popCell(pos)), ...cells.map((pos) => this.spawnParticleBurst(pos))]);
+  }
+
+  /**
+   * Línea que conecta, en orden, las celdas de una combinación ganadora — sigue el
+   * patrón real de la línea (incluye zigzags, usa las `positions` que ya manda el
+   * servidor). Cada tramo tiene un quiebre a mitad de camino en vez de ser una recta
+   * perfecta, para que se lea como un circuito/nodo de hackeo, no una línea de casino genérica.
+   */
+  private async drawWinLine(positions: GridPosition[], color: number): Promise<void> {
+    if (positions.length === 0) return;
+
+    const points = positions.map((p) => this.cellCenter(p));
+
+    const line = new Graphics();
+    line.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
+      const prev = points[i - 1];
+      const curr = points[i];
+      const midX = (prev.x + curr.x) / 2 + (Math.random() - 0.5) * 10;
+      const midY = (prev.y + curr.y) / 2 + (Math.random() - 0.5) * 10;
+      line.lineTo(midX, midY);
+      line.lineTo(curr.x, curr.y);
+    }
+    line.stroke({ width: 3, color });
+    line.alpha = 0;
+    this.fxLayer.addChild(line);
+
+    const nodes = points.map((p) => {
+      const node = new Graphics().circle(0, 0, 6).fill({ color });
+      node.x = p.x;
+      node.y = p.y;
+      node.alpha = 0;
+      this.fxLayer.addChild(node);
+      return node;
+    });
+
+    await tweenValue(0, 1, 200, (v) => {
+      line.alpha = v;
+      nodes.forEach((n) => (n.alpha = v));
+    });
+    await delay(450);
+    await tweenValue(1, 0, 300, (v) => {
+      line.alpha = v;
+      nodes.forEach((n) => (n.alpha = v));
+    });
+
+    this.fxLayer.removeChild(line);
+    nodes.forEach((n) => this.fxLayer.removeChild(n));
   }
 
   /** Pequeño "pop" de escala en la celda — refuerza visualmente que ese símbolo formó parte de un premio. */

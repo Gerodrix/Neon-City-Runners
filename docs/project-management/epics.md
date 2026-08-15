@@ -167,7 +167,7 @@ Formato: cada Epic agrupa historias de usuario con criterios de aceptación. Los
 ---
 
 ## NCR-E10 — VFX y partículas
-**Estado:** 🟡 En progreso (segunda pasada — falta la línea que conecta nodos de una combinación y la marca visual de Cores sticky)
+**Estado:** 🟡 En progreso (solo falta la marca visual de Cores sticky, que espera al arte final)
 
 - **NCR-S10.1** — Como jugador, quiero ver un rayo/efecto glitch que conecte visualmente al Core AI con cada Wild que genera, para que se note que es importante que caiga.
   *Criterios de aceptación:* rayo quebrado (glitch) desde el Core hasta cada Wild, con secuencia causa→efecto (rayo primero, asentamiento del Wild 120ms después). ✅ (D-24, D-25)
@@ -175,7 +175,8 @@ Formato: cada Epic agrupa historias de usuario con criterios de aceptación. Los
   *Criterios de aceptación:* ráfaga de partículas + escala en cada celda ganadora única, agrupado por celda para no duplicar si pertenece a 2+ líneas. ✅
 - **NCR-S10.3** — Como jugador, quiero ver un cartel de premio grande (tipo NICE/BIG/MEGA/EPIC WIN) entre giros, cuando el premio lo amerite.
   *Criterios de aceptación:* cartel con contador animado, aparece en base game, en cada giro de Free Spins, y en el total de la ronda; umbral proporcional a la apuesta total (3x/8x/20x/50x). ✅ (D-26)
-- **NCR-S10.4 (pendiente)** — Línea que conecte los nodos ganadores de una combinación (izquierda a derecha, estilo circuito de hackeo), reemplazando el glow por celda suelta. Ver `pending-features-plan.md`.
+- **NCR-S10.4** — Línea que conecte los nodos ganadores de una combinación (izquierda a derecha, estilo circuito de hackeo), reemplazando el glow por celda suelta.
+  *Criterios de aceptación:* la línea sigue el patrón real de cada `lineWin.positions` (zigzags incluidos), con quiebres tipo circuito. Si ganan varias líneas a la vez, cada una tiene su propio color y arranca con un pequeño delay para no verse como ruido superpuesto. ✅ (D-30)
 - **NCR-S10.5 (pendiente)** — Marca visual persistente para Cores sticky en Free Spins, distinta a un Core recién caído. Se posterga hasta reencuadrar el arte final.
 - **NCR-S10.6** — Como jugador, quiero que el Wild se sienta transformado por el Core, no que aparezca directo al parar el rodillo.
   *Criterios de aceptación:* durante el blur de giro y al asentarse, las celdas que van a ser Wild muestran un símbolo normal; recién el efecto del Core las transforma. ✅ (D-29)

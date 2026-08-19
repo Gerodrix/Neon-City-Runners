@@ -71,3 +71,9 @@ export const MAX_TOPUP_AMOUNT = 100000;
 // la compra sea igual al RTP general del juego — no es un número arbitrario, ver D-21.
 // Recalibrado en D-27 (el rodillo 1 sin Core hizo que las rondas de FS paguen más).
 export const BUY_BONUS_MULTIPLIER = 32.0;
+
+// NCR-E12 — Core Boost: multiplicador de apuesta a cambio de asegurar al menos 1 Core AI
+// en el giro (si no cae de forma natural, se fuerza uno — nunca en el rodillo 1, D-27).
+// Alcance v1: solo afecta el giro base en sí, no persiste dentro de una ronda de Free
+// Spins que dispare desde acá — ver GDD, D-31. Calibrado por simulación, no a ojo.
+export const CORE_BOOST_MULTIPLIER = 1.3; // calibrado por simulación (2 corridas de 3M: 1.315x y 1.295x)

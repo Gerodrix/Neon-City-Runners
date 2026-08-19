@@ -5,7 +5,7 @@ import { tweenValue, delay, Easing } from './Tween';
 
 const GRID_REELS = 5;
 const GRID_ROWS = 4;
-const CELL_SIZE = 120;
+const CELL_SIZE = 140;
 const SERVER_URL = 'http://localhost:4000';
 
 // Color placeholder por símbolo, hasta tener sprites reales.
@@ -87,6 +87,8 @@ export class SlotGame {
   private minTopupAmount = 1;
   private maxTopupAmount = 100000;
   private buyBonusMultiplier = 0; // 0 hasta que /bet-config responda — el botón queda deshabilitado mientras tanto
+  private coreBoostMultiplier = 0; // ídem
+  private coreBoostEnabled = false;
   private isSpinning = false;
   private wasInsufficientFunds = false;
 
@@ -97,8 +99,8 @@ export class SlotGame {
   constructor(private app: Application) {
     this.playerId = getPlayerId();
     this.gridContainer = new Container();
-    this.gridContainer.x = 40;
-    this.gridContainer.y = 40;
+    this.gridContainer.x = 30;
+    this.gridContainer.y = 30;
     this.app.stage.addChild(this.gridContainer);
 
     this.fxLayer = new Container();
@@ -109,6 +111,7 @@ export class SlotGame {
     this.bindTopupControl();
     this.bindBetControls();
     this.bindBuyBonusButton();
+    this.bindCoreBoostToggle();
     this.loadBetConfig();
     this.loadTopupConfig();
     this.loadInitialBalance();
@@ -118,12 +121,19 @@ export class SlotGame {
     try {
       const response = await fetch(`${SERVER_URL}/bet-config`);
       if (!response.ok) throw new Error(`Error del servidor: ${response.status}`);
-      const data: { minBetPerLine: number; maxBetPerLine: number; betSteps: number[]; buyBonusMultiplier: number } =
-        await response.json();
+      const data: {
+        minBetPerLine: number;
+        maxBetPerLine: number;
+        betSteps: number[];
+        buyBonusMultiplier: number;
+        coreBoostMultiplier: number;
+      } = await response.json();
       this.betSteps = data.betSteps;
       this.buyBonusMultiplier = data.buyBonusMultiplier;
+      this.coreBoostMultiplier = data.coreBoostMultiplier;
       this.betIndex = Math.min(this.betIndex, this.betSteps.length - 1);
       this.updateBetDisplay();
+      this.updateCoreBoostLabel();
       this.refreshSpinAvailability();
     } catch (error) {
       console.error('Error al obtener la configuración de apuesta:', error);
@@ -198,12 +208,12 @@ export class SlotGame {
 
   private refreshSpinAvailability(): void {
     const button = document.getElementById('spin-btn') as HTMLButtonElement;
-    const totalBet = this.betPerLine * 12;
-    const insufficientNow = this.balance < totalBet;
+    const effectiveTotalBet = this.betPerLine * 12 * (this.coreBoostEnabled ? this.coreBoostMultiplier : 1);
+    const insufficientNow = this.balance < effectiveTotalBet;
 
     if (insufficientNow) {
       button.disabled = true;
-      this.setFreeSpinsStatus(`💸 Saldo insuficiente para apostar ${this.betPerLine} por línea — recargá saldo`);
+      this.setFreeSpinsStatus(`💸 Saldo insuficiente para apostar ${effectiveTotalBet.toFixed(2)} — recargá saldo`);
     } else {
       if (!this.isSpinning) button.disabled = false;
       if (this.wasInsufficientFunds) this.hideFreeSpinsStatus();
@@ -211,6 +221,7 @@ export class SlotGame {
 
     this.wasInsufficientFunds = insufficientNow;
     this.refreshBuyBonusAvailability();
+    this.updateCoreBoostLabel();
   }
 
   private refreshBuyBonusAvailability(): void {
@@ -255,6 +266,32 @@ export class SlotGame {
     (document.getElementById('bet-decrease') as HTMLButtonElement).disabled = this.isSpinning || this.betIndex <= 0;
     (document.getElementById('bet-increase') as HTMLButtonElement).disabled =
       this.isSpinning || this.betIndex >= this.betSteps.length - 1;
+    this.updateCoreBoostLabel();
+  }
+
+  // ---------- Core Boost (NCR-E12) ----------
+
+  private bindCoreBoostToggle(): void {
+    const checkbox = document.getElementById('core-boost-toggle') as HTMLInputElement;
+    checkbox.addEventListener('change', () => {
+      this.coreBoostEnabled = checkbox.checked;
+      this.refreshSpinAvailability();
+    });
+  }
+
+  private updateCoreBoostLabel(): void {
+    const label = document.getElementById('core-boost-label')!;
+    const checkbox = document.getElementById('core-boost-toggle') as HTMLInputElement;
+
+    if (this.coreBoostMultiplier <= 0) {
+      label.textContent = 'Core Boost (—)';
+      checkbox.disabled = true;
+      return;
+    }
+
+    checkbox.disabled = this.isSpinning;
+    const boostedTotal = this.betPerLine * 12 * this.coreBoostMultiplier;
+    label.textContent = `Core Boost (apuesta x${this.coreBoostMultiplier.toFixed(2)} = ${boostedTotal.toFixed(2)})`;
   }
 
   // ---------- Grid: construcción y dibujo de celdas ----------
@@ -741,7 +778,11 @@ export class SlotGame {
       const response = await fetch(`${SERVER_URL}/spin`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ betPerLine: this.betPerLine, playerId: this.playerId }),
+        body: JSON.stringify({
+          betPerLine: this.betPerLine,
+          playerId: this.playerId,
+          coreBoostEnabled: this.coreBoostEnabled,
+        }),
       });
 
       if (!response.ok) {
@@ -758,8 +799,11 @@ export class SlotGame {
       this.updateUI(result.totalWin);
       this.refreshSpinAvailability();
 
-      await this.highlightWinningLines(result.lineWins);
+      // El Core tiene que terminar de transformar sus Wilds ANTES de que se dibuje
+      // la línea conectora — si no, la línea se traza mientras la celda todavía
+      // muestra el símbolo "falso" que usamos para disimular la caída (D-29).
       await this.playCoreEffects(result.corePositions, result.coreWildPositions);
+      await this.highlightWinningLines(result.lineWins);
       await this.showWinBanner(result.totalWin, this.betPerLine * 12);
 
       if (result.freeSpinsTriggered && result.freeSpinsSessionId) {
@@ -814,8 +858,8 @@ export class SlotGame {
         `HEIST MODE — Giros restantes: ${result.spinsRemaining} | Ganancia de la ronda: ${result.sessionTotalWin.toFixed(2)}`
       );
 
-      await this.highlightWinningLines(result.lineWins);
       await this.playCoreEffects(result.corePositions, result.coreWildPositions);
+      await this.highlightWinningLines(result.lineWins);
       await this.showWinBanner(result.spinWin, this.betPerLine * 12);
 
       if (result.sessionOver) {

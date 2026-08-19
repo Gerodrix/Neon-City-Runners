@@ -3,7 +3,7 @@ import cors from 'cors';
 import { spin, buyBonus } from './slot/SlotEngine.js';
 import { spinFreeSpins } from './slot/FreeSpinsLogic.js';
 import { getOrCreateBalance, adjustBalance } from './slot/PlayerBalance.js';
-import { MIN_BET_PER_LINE, MAX_BET_PER_LINE, BET_STEPS, MIN_TOPUP_AMOUNT, MAX_TOPUP_AMOUNT, BUY_BONUS_MULTIPLIER } from './config/SlotConfig.js';
+import { MIN_BET_PER_LINE, MAX_BET_PER_LINE, BET_STEPS, MIN_TOPUP_AMOUNT, MAX_TOPUP_AMOUNT, BUY_BONUS_MULTIPLIER, CORE_BOOST_MULTIPLIER } from './config/SlotConfig.js';
 
 const app = express();
 const PORT = 4000;
@@ -19,6 +19,7 @@ app.get('/bet-config', (_req, res) => {
     maxBetPerLine: MAX_BET_PER_LINE,
     betSteps: BET_STEPS,
     buyBonusMultiplier: BUY_BONUS_MULTIPLIER,
+    coreBoostMultiplier: CORE_BOOST_MULTIPLIER,
   });
 });
 
@@ -59,6 +60,7 @@ app.post('/balance/topup', (req, res) => {
 app.post('/spin', (req, res) => {
   const betPerLine = Number(req.body?.betPerLine ?? 1);
   const playerId = String(req.body?.playerId ?? '');
+  const coreBoostEnabled = Boolean(req.body?.coreBoostEnabled ?? false);
 
   if (!playerId) {
     return res.status(400).json({ error: 'playerId es requerido' });
@@ -69,7 +71,7 @@ app.post('/spin', (req, res) => {
       .json({ error: `betPerLine debe estar entre ${MIN_BET_PER_LINE} y ${MAX_BET_PER_LINE}` });
   }
 
-  const response = spin(betPerLine, playerId);
+  const response = spin(betPerLine, playerId, coreBoostEnabled);
 
   if (!response.ok) {
     return res.status(400).json({ error: response.error });

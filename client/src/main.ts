@@ -4,7 +4,7 @@ import { loadSymbolTextures } from './game/SymbolAssets';
 
 async function bootstrap() {
   const app = new Application();
-  await app.init({ width: 800, height: 640, backgroundColor: 0x0a0a12 });
+  await app.init({ width: 760, height: 620, backgroundColor: 0x0a0a12 });
 
   document.getElementById('pixi-container')!.appendChild(app.canvas);
 

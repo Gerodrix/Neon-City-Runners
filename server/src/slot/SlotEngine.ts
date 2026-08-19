@@ -1,4 +1,4 @@
-import { GRID_REELS, GRID_ROWS, REEL_STRIP_COUNTS, REEL_0_STRIP_COUNTS, CORE_MIN_WILDS, CORE_MAX_WILDS, SCATTER_MIN_TO_TRIGGER, FREE_SPINS_AWARDED, SCATTER_PAYOUT_MULTIPLIER, BUY_BONUS_MULTIPLIER } from '../config/SlotConfig.js';
+import { GRID_REELS, GRID_ROWS, REEL_STRIP_COUNTS, REEL_0_STRIP_COUNTS, CORE_MIN_WILDS, CORE_MAX_WILDS, SCATTER_MIN_TO_TRIGGER, FREE_SPINS_AWARDED, SCATTER_PAYOUT_MULTIPLIER, BUY_BONUS_MULTIPLIER, CORE_BOOST_MULTIPLIER } from '../config/SlotConfig.js';
 import { SymbolId, SYMBOL_DEFINITIONS } from './Symbol.js';
 import { buildReelStrip, spinReel } from './ReelStrip.js';
 import { PAYLINES } from './Paylines.js';
@@ -176,8 +176,36 @@ export function evaluateScatter(grid: SymbolId[][], totalBet: number): { scatter
   return { scatterCount, scatterWin, freeSpinsTriggered };
 }
 
-export function spin(betPerLine: number, playerId: string): SpinResponse {
-  const totalBet = betPerLine * PAYLINES.length;
+/**
+ * NCR-E12 — Fuerza un Core AI en el grid si no cayó ninguno de forma natural.
+ * Nunca en el rodillo 1 (D-27) ni pisando un Scatter existente. No hace nada si
+ * ya hay al menos un Core — el boost garantiza "al menos uno", no agrega de más.
+ */
+function forceCoreGuarantee(grid: SymbolId[][]): void {
+  for (let reel = 0; reel < GRID_REELS; reel++) {
+    for (let row = 0; row < GRID_ROWS; row++) {
+      if (grid[reel][row] === 'CORE') return; // ya hay al menos uno, no hace falta forzar
+    }
+  }
+
+  const candidates: number[] = [];
+  for (let reel = 1; reel < GRID_REELS; reel++) {
+    // arranca en 1: nunca en el rodillo 1 (D-27)
+    for (let row = 0; row < GRID_ROWS; row++) {
+      if (grid[reel][row] !== 'SCATTER') candidates.push(toIndex(reel, row));
+    }
+  }
+  if (candidates.length === 0) return; // no debería pasar nunca, pero por las dudas
+
+  const index = candidates[RNG.randomInt(candidates.length)];
+  const reel = Math.floor(index / GRID_ROWS);
+  const row = index % GRID_ROWS;
+  grid[reel][row] = 'CORE';
+}
+
+export function spin(betPerLine: number, playerId: string, coreBoostEnabled = false): SpinResponse {
+  const baseBet = betPerLine * PAYLINES.length;
+  const totalBet = coreBoostEnabled ? baseBet * CORE_BOOST_MULTIPLIER : baseBet;
   const currentBalance = getOrCreateBalance(playerId);
 
   if (currentBalance < totalBet) {
@@ -185,6 +213,7 @@ export function spin(betPerLine: number, playerId: string): SpinResponse {
   }
 
   const grid = generateGrid();
+  if (coreBoostEnabled) forceCoreGuarantee(grid);
 
   const corePositions = findCorePositions(grid);
   const coreWildPositions = applyCoreWildGeneration(grid, corePositions);
@@ -195,7 +224,8 @@ export function spin(betPerLine: number, playerId: string): SpinResponse {
 
   const freeSpinsAwarded = freeSpinsTriggered ? FREE_SPINS_AWARDED : 0;
   // El giro que activa Free Spins es base game: sus Cores NO quedan sticky (ver GDD, decisión D-05).
-  // La ronda de Free Spins arranca sin ningún Core pegado todavía.
+  // La ronda de Free Spins arranca sin ningún Core pegado todavía. El boost de este giro
+  // NO se propaga a la ronda de Free Spins (alcance v1, ver GDD, D-31).
   const freeSpinsSession = freeSpinsTriggered ? createFreeSpinsSession(betPerLine, freeSpinsAwarded, playerId) : null;
 
   const totalWin = totalLineWin + scatterWin;

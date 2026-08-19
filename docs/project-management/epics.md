@@ -183,10 +183,15 @@ Formato: cada Epic agrupa historias de usuario con criterios de aceptación. Los
 
 ---
 
-## NCR-E12 — Ver `pending-features-plan.md`
-**Estado:** 🔲 To Do (diseño ya pensado, sin implementar)
+## NCR-E12 — Core Boost
+**Estado:** ✅ Done
 
-Core Boost necesita su propia sesión de simulación antes de darse por terminada — no se calibra a ojo, mismo criterio que D-19/D-21.
+- **NCR-S12.1** — Como jugador, quiero poder pagar un extra para asegurar al menos 1 Core AI en el giro.
+  *Criterios de aceptación:* toggle en la UI, `POST /spin` acepta `coreBoostEnabled`; si no cae Core natural, se fuerza uno (nunca en el rodillo 1, D-27). ✅ Probado: 30/30 giros con boost activo tuvieron al menos un Core.
+- **NCR-S12.2** — Como desarrollador, quiero calibrar el costo del boost por simulación, no a ojo.
+  *Criterios de aceptación:* comparación de premio promedio con vs. sin boost forzado. ✅ `CORE_BOOST_MULTIPLIER = 1.3` (2 corridas de 3M: 1.315x y 1.295x). Ver D-32.
+- **NCR-S12.3 (decisión de alcance)** — El boost no persiste dentro de una ronda de Free Spins que dispare desde el giro boosteado.
+  *Criterios de aceptación:* decisión documentada con motivo. ✅ (D-31)
 
 ---
 

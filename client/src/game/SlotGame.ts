@@ -272,7 +272,8 @@ export class SlotGame {
   // ---------- Core Boost (NCR-E12) ----------
 
   private bindCoreBoostToggle(): void {
-    const checkbox = document.getElementById('core-boost-toggle') as HTMLInputElement;
+    const checkbox = document.getElementById('core-boost-toggle') as HTMLInputElement | null;
+    if (!checkbox) return; // tu HTML no tiene este control — se lo salta, no rompe el resto
     checkbox.addEventListener('change', () => {
       this.coreBoostEnabled = checkbox.checked;
       this.refreshSpinAvailability();
@@ -280,8 +281,9 @@ export class SlotGame {
   }
 
   private updateCoreBoostLabel(): void {
-    const label = document.getElementById('core-boost-label')!;
-    const checkbox = document.getElementById('core-boost-toggle') as HTMLInputElement;
+    const label = document.getElementById('core-boost-label');
+    const checkbox = document.getElementById('core-boost-toggle') as HTMLInputElement | null;
+    if (!label || !checkbox) return; // tu HTML no tiene este control — se lo salta
 
     if (this.coreBoostMultiplier <= 0) {
       label.textContent = 'Core Boost (—)';

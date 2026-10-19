@@ -19,3 +19,11 @@ Thumbs.db
 # Logs
 npm-debug.log*
 *.log
+
+# Local credentials and editor state
+.env.*
+!.env.example
+.dev.vars*
+!.dev.vars.example
+.vs/
+*.tsbuildinfo
